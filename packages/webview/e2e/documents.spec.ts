@@ -415,27 +415,45 @@ test('native dragging raw blocks up and down preserves their exact bytes and unt
     const before = await inspect(request);
     const rawIndex = before.blocks.findIndex(block => !block.editable);
     const otherIndex = up ? rawIndex - 1 : rawIndex + 1;
+    const containers = rich(page).locator('[data-node-type="blockContainer"]');
+    const ids = await containers.evaluateAll(elements => elements.map(element => element.getAttribute('data-id')));
+    expect(ids).toHaveLength(before.blocks.length);
+    const order = before.blocks.map(block => block.index);
+    [order[rawIndex], order[otherIndex]] = [order[otherIndex]!, order[rawIndex]!];
     const raw = page.getByRole('textbox', { name: '원문 Markdown' });
     await raw.hover();
     const handle = page.getByRole('button', { name: '블록 메뉴 열기', exact: true });
     await expect(handle).toBeVisible();
     const destination = paragraph(page, '첫 문단');
-    const box = await destination.boundingBox(); if (!box) throw new Error('Missing drop target');
     const origin = await handle.boundingBox(); if (!origin) throw new Error('Missing drag handle');
     await page.mouse.move(origin.x + origin.width / 2, origin.y + origin.height / 2);
     await page.mouse.down();
-    // Real dragstart requires crossing Chromium's drag threshold before entering
-    // the editor. Two moves over the drop position deliver native dragover.
-    await page.mouse.move(origin.x + origin.width / 2 + 5, origin.y + origin.height / 2 - 5, { steps: 5 });
-    const dropY = up ? box.y - 3 : box.y + box.height + 3;
-    await page.mouse.move(box.x + 12, dropY, { steps: 20 });
-    await page.mouse.move(box.x + 13, dropY);
+    // Cross the native drag threshold, then observe the actual dragged block.
+    await page.mouse.move(origin.x + origin.width / 2 + 20, origin.y + origin.height / 2, { steps: 5 });
+    const preview = page.locator('.bn-drag-preview [data-node-type="blockContainer"]');
+    await expect(preview).toHaveCount(1);
+    await expect(preview).toHaveAttribute('data-id', ids[rawIndex]!);
+    // Measure after native dragstart. A point 3px outside the text box lies on
+    // the NEXT paragraph's boundary, where platform caret hit-testing differs.
+    // Start/end points INSIDE this single-line paragraph unambiguously mean
+    // before/after it, regardless of the next paragraph's font metrics.
+    const box = await destination.boundingBox(); if (!box) throw new Error('Missing drop target');
+    const x = up ? box.x + 1 : box.x + box.width - 2;
+    const y = box.y + box.height / 2;
+    // Two moves over the drop position deliver native dragover.
+    await page.mouse.move(x, y, { steps: 20 });
+    await page.mouse.move(x + 1, y);
+    expect(await destination.evaluate((element, point) => {
+      const hit = document.elementFromPoint(point.x, point.y);
+      return hit === element || (hit !== null && element.contains(hit));
+    }, { x: x + 1, y })).toBe(true);
     await page.mouse.up();
+    // Distinguish a misplaced gesture from a snapshot/save ordering regression.
+    await expect.poll(() => containers.evaluateAll(elements => elements.map(element => element.getAttribute('data-id'))))
+      .toEqual(order.map(index => ids[index]));
     await expect(page.locator('.document-save-state')).toHaveText('저장하지 않은 변경');
     expect((await inspect(request)).source).toBe(before.source);
     const submitted = await save(page);
-    const order = before.blocks.map(block => block.index);
-    [order[rawIndex], order[otherIndex]] = [order[otherIndex]!, order[rawIndex]!];
     expect(submitted.blocks).toEqual(order.map(original => ({ original })));
     let expected = '', end = 0;
     for (const [index, block] of before.blocks.entries()) {
