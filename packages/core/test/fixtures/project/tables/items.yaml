@@ -1,0 +1,10 @@
+schema: items
+rows:
+  - code: "consumable_potion"
+    name: "회복약"
+    kind: "consumable"
+    note: "첫 줄\n둘째 줄"
+  - code: "currency_gold"
+    name: "골드"
+    kind: "currency"
+    note: "001"

@@ -1,0 +1,10 @@
+primary_key: "Key"
+columns:
+  Key:
+    type: "string"
+  Source:
+    type: "string"
+  Lore:
+    type: "string"
+  Note:
+    type: "string"

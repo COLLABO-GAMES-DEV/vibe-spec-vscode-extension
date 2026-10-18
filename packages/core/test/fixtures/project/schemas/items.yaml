@@ -1,0 +1,13 @@
+primary_key: code
+columns:
+  code:
+    type: string
+    label: "코드"
+  name:
+    type: text
+    required: true
+  kind:
+    type: enum
+    values: ["currency", "consumable"]
+  note:
+    type: text

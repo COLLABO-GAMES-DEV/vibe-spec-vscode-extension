@@ -1,0 +1,8 @@
+primary_key: "grade"
+columns:
+  grade:
+    type: "string"
+  chance_percent:
+    type: "decimal"
+    minimum: "0"
+    maximum: "100"

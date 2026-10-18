@@ -1,0 +1,31 @@
+primary_key: "sku"
+columns:
+  sku:
+    type: "string"
+  name:
+    type: "string"
+  reward_item:
+    type: "ref"
+    table: "items"
+    on_delete: "restrict"
+  bonus_item:
+    type: "ref"
+    table: "items"
+    on_delete: "restrict"
+  price_currency:
+    type: "ref"
+    table: "items"
+    on_delete: "restrict"
+  price:
+    type: "decimal"
+    minimum: "0"
+  quantity:
+    type: "integer"
+    minimum: "1"
+  sale_type:
+    type: "enum"
+    values:
+      - "regular"
+      - "limited"
+  note:
+    type: "string"

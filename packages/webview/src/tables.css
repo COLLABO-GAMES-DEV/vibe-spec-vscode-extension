@@ -1,0 +1,77 @@
+.tables-app {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 24px;
+  color: var(--vscode-foreground, #263247);
+  font-family: var(--vscode-font-family, system-ui, sans-serif);
+  font-size: var(--vscode-font-size, 13px);
+  line-height: 1.5;
+}
+.tables-app * { box-sizing: border-box; }
+.tables-app h1 { margin: 0; font-size: 22px; }
+.tables-app h2 { margin: 0 0 8px; font-size: 16px; }
+.tables-app h3 { margin: 16px 0 8px; font-size: 14px; }
+.tables-app p { margin: 8px 0; overflow-wrap: anywhere; }
+.tables-app code { overflow-wrap: anywhere; }
+.tables-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
+.tables-toolbar button { flex-shrink: 0; }
+.tables-muted { color: var(--vscode-descriptionForeground, #59677b); }
+.tables-form { max-width: 560px; }
+.tables-field { display: flex; flex-direction: column; gap: 5px; margin: 20px 0; }
+.tables-field label { font-weight: 600; }
+.tables-field p { margin: 0; }
+.tables-field input {
+  width: 100%; min-width: 0; padding: 8px 10px; border-radius: 3px;
+  border: 1px solid var(--vscode-input-border, #b7c2d1);
+  color: var(--vscode-input-foreground, #263247);
+  background: var(--vscode-input-background, #fff); font: inherit;
+}
+.tables-field input[aria-invalid=true] { border-color: var(--vscode-inputValidation-errorBorder, #b42318); }
+.tables-app button {
+  padding: 7px 14px; border: 1px solid transparent; border-radius: 3px; font: inherit;
+  color: var(--vscode-button-foreground, #fff); background: var(--vscode-button-background, #196ab0); cursor: pointer;
+}
+.tables-app button:hover { background: var(--vscode-button-hoverBackground, #12548e); }
+.tables-app button.tables-secondary {
+  color: var(--vscode-button-secondaryForeground, #263247);
+  background: var(--vscode-button-secondaryBackground, #eef1f5);
+  border-color: var(--vscode-panel-border, #ccd4df);
+}
+.tables-app button.tables-secondary:hover { background: var(--vscode-button-secondaryHoverBackground, #e0e6ee); }
+.tables-app button:disabled, .tables-app input:disabled { opacity: .55; cursor: default; }
+.tables-app :is(button, input):focus-visible { outline: 2px solid var(--vscode-focusBorder, #1765a7); outline-offset: 2px; }
+.tables-section { margin: 18px 0; padding: 16px; border: 1px solid var(--vscode-panel-border, #ccd4df); border-radius: 4px; }
+.tables-section ul { margin: 8px 0; padding-left: 22px; }
+.tables-error, .tables-warning, .tables-notice { margin: 16px 0; padding: 12px; border: 1px solid var(--vscode-panel-border, #ccd4df); border-radius: 3px; }
+.tables-error, .tables-field-error { color: var(--vscode-errorForeground, #b42318); }
+.tables-error { border-color: var(--vscode-inputValidation-errorBorder, #b42318); }
+.tables-warning { border-left: 3px solid var(--vscode-editorWarning-foreground, #9a6700); }
+.tables-notice { border-left: 3px solid var(--vscode-testing-iconPassed, #278343); }
+.tables-usages { max-height: 340px; overflow: auto; }
+.tables-usages li { margin: 10px 0; }
+.tables-usages code, .tables-usages span { display: block; white-space: pre-wrap; overflow-wrap: anywhere; }
+.tables-usages span { color: var(--vscode-descriptionForeground, #59677b); }
+.tables-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.tables-list-scroll { overflow-x: auto; margin: 18px 0; border: 1px solid var(--vscode-panel-border, #ccd4df); border-radius: 4px; }
+.tables-app table { width: 100%; border-collapse: collapse; text-align: left; }
+.tables-app th, .tables-app td { padding: 12px; border-bottom: 1px solid var(--vscode-panel-border, #ccd4df); overflow-wrap: anywhere; }
+.tables-app tbody th { font-weight: 500; }
+.tables-app thead { background: var(--vscode-sideBar-background, #f4f6f9); }
+.tables-delete-actions { display: flex; align-items: flex-start; flex-direction: column; gap: 16px; margin-top: 24px; }
+.tables-confirm { display: flex; align-items: center; gap: 8px; }
+.tables-confirm input { width: 16px; height: 16px; margin: 0; accent-color: var(--vscode-focusBorder, #1765a7); }
+@media (max-width: 600px) {
+  .tables-app { padding: 16px; }
+  .tables-toolbar { align-items: flex-start; flex-wrap: wrap; }
+  .tables-app th, .tables-app td { padding: 8px; }
+  .tables-actions { min-width: 110px; }
+}
+@media (prefers-color-scheme: dark) {
+  .tables-app { color: var(--vscode-foreground, #dbe1ee); }
+  .tables-muted, .tables-usages span { color: var(--vscode-descriptionForeground, #a8b3c5); }
+  .tables-field input { color: var(--vscode-input-foreground, #e5e9f0); background: var(--vscode-input-background, #242b36); border-color: var(--vscode-input-border, #464c58); }
+  .tables-error, .tables-field-error { color: var(--vscode-errorForeground, #ff8a80); }
+  .tables-app thead { background: var(--vscode-sideBar-background, #20242c); }
+  .tables-app button.tables-secondary { color: var(--vscode-button-secondaryForeground, #e5e9f0); background: var(--vscode-button-secondaryBackground, #303743); }
+  .tables-app button.tables-secondary:hover { background: var(--vscode-button-secondaryHoverBackground, #414959); }
+}

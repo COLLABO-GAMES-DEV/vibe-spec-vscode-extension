@@ -1,0 +1,94 @@
+{
+  "name": "vibe-spec",
+  "repository": {"type": "git", "url": "https://github.com/COLLABO-GAMES-DEV/vibe-spec-vscode-extension.git", "directory": "packages/vscode"},
+  "bugs": {"url": "https://github.com/COLLABO-GAMES-DEV/vibe-spec-vscode-extension/issues"},
+  "homepage": "https://github.com/COLLABO-GAMES-DEV/vibe-spec-vscode-extension#readme",
+  "displayName": "vibe-spec — 게임 기획",
+  "description": "Git 파일을 원본으로 사용하는 게임 기획 테이블·문서 편집기",
+  "version": "0.7.1",
+  "publisher": "ijun17",
+  "license": "UNLICENSED",
+  "private": true,
+  "engines": { "vscode": "^1.140.0" },
+  "categories": ["Visualization", "Other"],
+  "keywords": ["game-design", "planning", "spreadsheet", "yaml", "git", "codex"],
+  "icon": "media/icon.png",
+  "main": "./dist/extension.cjs",
+  "activationEvents": ["onStartupFinished"],
+  "capabilities": { "untrustedWorkspaces": { "supported": false } },
+  "contributes": {
+    "commands": [
+      { "command": "vibe.newResource", "title": "새로 만들기: 폴더·표·문서", "icon": "$(add)" },
+      { "command": "vibe.newFolder", "title": "새 폴더", "icon": "$(new-folder)" },
+      { "command": "vibe.renameFolder", "title": "폴더 이름 바꾸기" },
+      { "command": "vibe.deleteFolder", "title": "빈 폴더 삭제" },
+      { "command": "vibe.moveFolder", "title": "폴더 이동" },
+      { "command": "vibe.moveResource", "title": "다른 폴더로 이동" },
+      { "command": "vibe.openDocument", "title": "vibe-spec: 문서 열기" },
+      { "command": "vibe.newDocument", "title": "새 문서", "icon": "$(add)" },
+      { "command": "vibe.renameDocument", "title": "문서 이름 바꾸기" },
+      { "command": "vibe.deleteDocument", "title": "문서 삭제" },
+      { "command": "vibe.documentUsage", "title": "문서 사용처" },
+      { "command": "vibe.newTable", "title": "새 테이블", "icon": "$(add)" },
+      { "command": "vibe.renameTable", "title": "테이블 이름 바꾸기" },
+      { "command": "vibe.deleteTable", "title": "테이블 삭제" },
+      { "command": "vibe.save", "title": "vibe-spec: 변경 사유와 함께 저장" },
+      { "command": "vibe.push", "title": "vibe-spec: 올리기" },
+      { "command": "vibe.pull", "title": "vibe-spec: 받아오기" },
+      { "command": "vibe.git", "title": "vibe-spec: 저장·올리기 상태" },
+      { "command": "vibe.import", "title": "vibe-spec: 불러오기", "icon": "$(file-add)" },
+      { "command": "vibe.export", "title": "vibe-spec: 개발용 내보내기", "icon": "$(export)" },
+      { "command": "vibe.selectFolder", "title": "vibe-spec: 기획 폴더 선택" },
+      { "command": "vibe.initFolder", "title": "vibe-spec: 기획 폴더 초기화" },
+      { "command": "vibe.openTable", "title": "vibe-spec: 테이블 열기" },
+      { "command": "vibe.openPlan", "title": "vibe-spec: 기획 비교", "icon": "$(git-compare)" },
+      { "command": "vibe.refresh", "title": "vibe-spec: 새로 고침", "icon": "$(refresh)" },
+      { "command": "vibe.openError", "title": "vibe-spec: 오류 위치로 이동" }
+    ],
+    "viewsContainers": { "activitybar": [{ "id": "vibe", "title": "vibe-spec", "icon": "media/vibe.svg" }] },
+    "views": { "vibe": [
+      { "id": "vibe.tables", "name": "기획" }, { "id": "vibe.plans", "name": "기획 비교" }, { "id": "vibe.errors", "name": "검증 오류" }, { "id": "vibe.delivery", "name": "저장·올리기" }
+    ] },
+    "menus": { "view/item/context": [
+      { "command": "vibe.newFolder", "when": "view == vibe.tables && viewItem == vibe-folder", "group": "folder@0" },
+      { "command": "vibe.newTable", "when": "view == vibe.tables && viewItem == vibe-folder", "group": "folder@1" },
+      { "command": "vibe.newDocument", "when": "view == vibe.tables && viewItem == vibe-folder", "group": "folder@2" },
+      { "command": "vibe.renameFolder", "when": "view == vibe.tables && viewItem == vibe-folder", "group": "folder@3" },
+      { "command": "vibe.moveFolder", "when": "view == vibe.tables && viewItem == vibe-folder", "group": "folder@4" },
+      { "command": "vibe.deleteFolder", "when": "view == vibe.tables && viewItem == vibe-folder", "group": "folder@5" },
+      { "command": "vibe.moveResource", "when": "view == vibe.tables && viewItem == vibe-table", "group": "table" },
+      { "command": "vibe.moveResource", "when": "view == vibe.tables && viewItem == vibe-document", "group": "document" },
+      { "command": "vibe.documentUsage", "when": "view == vibe.tables && viewItem == vibe-document", "group": "document" },
+      { "command": "vibe.renameDocument", "when": "view == vibe.tables && viewItem == vibe-document", "group": "document" },
+      { "command": "vibe.deleteDocument", "when": "view == vibe.tables && viewItem == vibe-document", "group": "document" },
+      { "command": "vibe.renameTable", "when": "view == vibe.tables && viewItem == vibe-table", "group": "table" },
+      { "command": "vibe.deleteTable", "when": "view == vibe.tables && viewItem == vibe-table", "group": "table" }
+    ], "view/title": [
+      { "command": "vibe.newResource", "when": "view == vibe.tables", "group": "navigation@0" },
+      { "command": "vibe.import", "when": "view == vibe.tables", "group": "transfer@1" },
+      { "command": "vibe.export", "when": "view == vibe.tables", "group": "transfer@2" },
+      { "command": "vibe.refresh", "when": "view == vibe.tables", "group": "navigation@1" },
+      { "command": "vibe.openPlan", "when": "view == vibe.plans", "group": "navigation@1" },
+      { "command": "vibe.refresh", "when": "view == vibe.plans", "group": "navigation@2" }
+    ] },
+    "viewsWelcome": [{
+      "view": "vibe.tables",
+      "contents": "기획 폴더를 선택해 시작하세요.\n[기획 폴더 선택](command:vibe.selectFolder)\n[새 기획 폴더 초기화](command:vibe.initFolder)"
+    }]
+  },
+  "scripts": {
+    "build": "node build.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test:integration": "vscode-test && vscode-test --config test/multi-root.config.mjs",
+    "package": "node -e \"require('node:fs').mkdirSync('../../artifacts', {recursive:true})\" && vsce package --no-dependencies --skip-license --allow-missing-repository --out ../../artifacts/"
+  },
+  "dependencies": { "@vibe-spec/core": "workspace:*", "@vibe-spec/webview": "workspace:*" },
+  "devDependencies": {
+    "@types/vscode": "1.140.0",
+    "@types/mocha": "10.0.10",
+    "@vscode/test-cli": "0.0.15",
+    "@vscode/test-electron": "3.1.0",
+    "@vscode/vsce": "4.0.0",
+    "esbuild": "0.28.2"
+  }
+}

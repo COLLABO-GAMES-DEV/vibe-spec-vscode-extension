@@ -1,0 +1,8 @@
+schema: "grade-rates"
+rows:
+  - grade: "A"
+    chance_percent: "0.005"
+  - grade: "B"
+    chance_percent: "120.0000"
+  - grade: "C"
+    chance_percent: "12.5000"

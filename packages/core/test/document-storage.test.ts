@@ -1,0 +1,71 @@
+import { execFileSync } from 'node:child_process';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, expect, it } from 'vitest';
+import { initProject, loadProject } from '../src/project.js';
+import { createDocument, editDocument } from '../src/documents.js';
+import { addDocumentImage } from '../src/document-assets.js';
+import { saveProject, getGitStatus, pushProject, pullProject, resolveProject } from '../src/git.js';
+import { applyStructureEdit } from '../src/structure.js';
+const roots:string[]=[];
+afterEach(async()=>{for(const root of roots.splice(0))await rm(root,{recursive:true,force:true,maxRetries:3});});
+async function fixture(){const root=await mkdtemp(join(tmpdir(),'vibe 문서 저장-'));roots.push(root);return initProject(root);}
+const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=','base64');
+it('Git saves Markdown and images with exact CRLF/BOM bytes even under autocrlf',async()=>{
+ let project=await fixture();
+ const git=(...args:string[])=>execFileSync('git',args,{cwd:project.root});
+ git('init','-q');git('config','user.name','Test');git('config','user.email','test@example.invalid');git('config','commit.gpgsign','false');git('config','core.autocrlf','true');
+ const image=await addDocumentImage(project.root,project.revision,{name:'한글 그림.png',bytes:png});
+ project=await loadProject(project.root);
+ const source='\uFEFF# 제목\r\n\r\n원문  \r\n\r\n![그림]('+image.path+')';
+ project=(await createDocument(project.root,project.revision,'기획',source)).project;
+ expect((await getGitStatus(project.root)).changes).toContain('documents/기획.md');
+ await saveProject(project.root,'문서와 그림');
+ expect(git('show','HEAD:documents/기획.md')).toEqual(Buffer.from(source));
+ expect(git('show','HEAD:documents/'+image.path)).toEqual(png);
+ const edited=await editDocument(project.root,project.revision,'기획',[{op:'replace',block:1,markdown:'수정한 문단'}]);
+ expect(await readFile(join(project.root,'documents/기획.md'),'utf8')).toBe(source.replace('원문  ','수정한 문단'));
+ expect(edited.project.revision).not.toBe(project.revision);
+},30_000);
+it('image writes use revision checks, immutable names, and source-byte revision changes',async()=>{
+ const project=await fixture();
+ const preview=await addDocumentImage(project.root,project.revision,{name:'그림.png',bytes:png},{dryRun:true});
+ expect(preview.applied).toBe(false);expect((await loadProject(project.root)).revision).toBe(project.revision);
+ const result=await addDocumentImage(project.root,project.revision,{name:'그림.png',bytes:png});
+ expect(result.revision).not.toBe(project.revision);
+ await expect(addDocumentImage(project.root,project.revision,{name:'다른.png',bytes:png})).rejects.toMatchObject({code:'STALE_REVISION'});
+ const current=await loadProject(project.root);
+ await writeFile(join(project.root,'documents/'+result.path),Buffer.concat([png,Buffer.from('changed')]));
+ expect((await loadProject(project.root)).revision).not.toBe(current.revision);
+ await expect(addDocumentImage(project.root,current.revision,{name:'unsafe.svg',bytes:Buffer.from('<svg/>')})).rejects.toMatchObject({code:'IMAGE_UNSUPPORTED'});
+});
+it('table creation cannot collide with an existing document, including case variants',async()=>{
+ let project=await fixture();project=(await createDocument(project.root,project.revision,'Items','# 문서')).project;
+ await expect(applyStructureEdit(project.root,project.revision,{op:'table-create',table:'items',key:{code:'key',label:'Key'}})).rejects.toMatchObject({code:'NAME_EXISTS'});
+});
+
+it('pull presents Markdown conflicts as complete files and preserves the chosen source bytes', async () => {
+  let a = await fixture();
+  const sandbox = await mkdtemp(join(tmpdir(), 'vibe-document-merge-')); roots.push(sandbox);
+  const git = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd });
+  const configure = (root: string) => { git(root, 'config', 'user.name', 'Test'); git(root, 'config', 'user.email', 'test@example.invalid'); git(root, 'config', 'commit.gpgsign', 'false'); };
+  const remote = join(sandbox, 'remote.git'), clone = join(sandbox, 'clone');
+  git(sandbox, 'init', '--bare', '-b', 'main', remote);
+  git(a.root, 'init', '-b', 'main'); configure(a.root);
+  git(a.root, 'remote', 'add', 'origin', remote);
+  a = (await createDocument(a.root, a.revision, 'guide', '# Guide\r\n\r\nOriginal\r\n\r\nUntouched  ')).project;
+  await saveProject(a.root, 'Initial document'); await pushProject(a.root);
+  git(sandbox, 'clone', remote, clone); configure(clone);
+  let b = await loadProject(clone);
+  a = (await editDocument(a.root, a.revision, 'guide', [{ op: 'replace', block: 1, markdown: 'From A' }])).project;
+  b = (await editDocument(b.root, b.revision, 'guide', [{ op: 'replace', block: 1, markdown: 'From B' }])).project;
+  const wanted = b.sources.get('documents/guide.md');
+  await saveProject(a.root, 'A'); await pushProject(a.root); await saveProject(clone, 'B');
+  const pulled = await pullProject(clone);
+  expect(pulled.completed).toBe(false);
+  expect(pulled.status.conflicts).toEqual(expect.arrayContaining([expect.objectContaining({ file: 'documents/guide.md', kind: 'file', managed: true })]));
+  const resolved = await resolveProject(clone, pulled.status.revision, [{ file: 'documents/guide.md', choice: 'ours' }]);
+  expect(resolved.completed).toBe(true);
+  expect(await readFile(join(clone, 'documents/guide.md'), 'utf8')).toBe(wanted);
+}, process.platform === 'win32' ? 90_000 : 30_000);

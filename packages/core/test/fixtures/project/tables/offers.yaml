@@ -1,0 +1,12 @@
+schema: offers
+rows:
+  - sku: "bundle"
+    currency: "currency_gold"
+    price: "+001.2300E+0002"
+    count: "900719925474099312345"
+    available: true
+  - sku: "starter"
+    currency: null
+    price: "-0.000"
+    count: "001"
+    available: false

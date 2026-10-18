@@ -1,0 +1,46 @@
+.documents-content { min-width: 0; max-width: 1100px; margin: auto; padding: 18px clamp(16px, 4vw, 64px); }
+.documents-app { min-height: 100vh; }
+.document-header { display: flex; align-items: center; gap: 12px; min-height: 32px; margin-bottom: 8px; }
+.document-header h1 { overflow-wrap: anywhere; font-size: 25px; }
+.document-save-state { color: var(--muted); font-size: 12px; margin-left: auto; }
+.document-usages header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.document-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.documents-app input:not([type="checkbox"]), .documents-app textarea { color: var(--vscode-input-foreground, inherit); background: var(--vscode-input-background, #fff); border: 1px solid var(--line); border-radius: 3px; padding: 6px; }
+.document-references { list-style: none; padding: 0; margin: 12px 0; }
+.document-link { background: var(--surface); color: inherit; display: inline-flex; gap: 12px; flex-wrap: wrap; text-align: left; border: 1px solid var(--line); }
+.document-link:hover { background: var(--vscode-list-hoverBackground, #e5ecf5); }
+.document-value { font-family: var(--vscode-editor-font-family, monospace); white-space: pre-wrap; }
+.document-rich { margin: 0; }
+.document-rich .bn-container { color: var(--vscode-editor-foreground, #263247); }
+.document-rich .bn-editor { padding: 8px 24px 80px; min-height: 300px; background: var(--vscode-editor-background, #fff); color: inherit; font-family: var(--vscode-font-family, system-ui, sans-serif); }
+.document-rich .bn-block-content { padding-block: 3px; line-height: 1.5; }
+.document-rich .bn-block-content[data-content-type="heading"] { margin-top: 12px; }
+.document-rich .bn-block-outer:first-child > .bn-block > .bn-block-content[data-content-type="heading"] { margin-top: 0; }
+.document-rich .bn-container button { color: inherit; }
+/* Markdown does not store image dimensions. */
+.document-rich .bn-resize-handle { display: none !important; }
+.document-raw-block { width: 100%; }
+.document-raw-block textarea { display: block; width: 100%; resize: vertical; font-family: var(--vscode-editor-font-family, monospace); line-height: 1.5; box-sizing: border-box; }
+.document-error, .document-warning, .document-notice { padding: 12px; overflow-wrap: anywhere; border: 1px solid var(--line); }
+.document-error { background: var(--vscode-inputValidation-errorBackground, #fff1f1); border-color: var(--vscode-inputValidation-errorBorder, #bd3939); }
+.document-warning { background: var(--vscode-inputValidation-warningBackground, #fff9e8); border-color: var(--vscode-inputValidation-warningBorder, #bb942c); }
+.document-notice { background: var(--surface); }
+.document-management { padding: 18px; border: 1px solid var(--accent); border-radius: 5px; margin-bottom: 18px; }
+.document-management > label { display: flex; gap: 10px; align-items: center; margin: 14px 0; }
+.document-management input:not([type="checkbox"]) { width: min(400px, 75%); }
+.document-empty { padding: 36px 0; color: var(--muted); }
+.document-diagnostics, .document-usages { margin: 24px 0; }
+.document-diagnostics li, .document-usages li { margin: 8px 0; overflow-wrap: anywhere; }
+.document-menu { position: relative; }
+.document-menu summary { cursor: pointer; list-style: none; padding: 4px 8px; border-radius: 4px; }
+.document-menu summary::-webkit-details-marker { display: none; }
+.document-menu summary:hover, .document-menu summary:focus-visible { background: var(--surface); }
+.document-menu-items { position: absolute; z-index: 20; right: 0; top: 100%; min-width: 180px; max-width: 320px;
+  padding: 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--vscode-editor-background, #fff); box-shadow: 0 4px 16px #0002; }
+.document-menu-items button { display: block; width: 100%; text-align: left; color: inherit; background: transparent; padding: 8px; }
+.document-menu-items button:hover { background: var(--surface); }
+@media (max-width: 700px) { .documents-content { padding: 16px 12px 16px 32px; } .document-header { flex-wrap: wrap; } }
+
+.document-current { margin: 12px 0; }
+.document-current summary { cursor: pointer; padding: 6px 0; }
+.document-current pre { padding: 12px; background: var(--surface); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 360px; overflow: auto; }

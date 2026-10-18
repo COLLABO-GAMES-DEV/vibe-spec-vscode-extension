@@ -1,0 +1,26 @@
+{
+  "name": "vibe-spec-vscode-extension",
+  "license": "UNLICENSED",
+  "repository": {"type": "git", "url": "https://github.com/COLLABO-GAMES-DEV/vibe-spec-vscode-extension.git"},
+  "bugs": {"url": "https://github.com/COLLABO-GAMES-DEV/vibe-spec-vscode-extension/issues"},
+  "homepage": "https://github.com/COLLABO-GAMES-DEV/vibe-spec-vscode-extension#readme",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.5.1",
+  "engines": { "node": "^24.0.0 || >=26.0.0" },
+  "scripts": {
+    "vibe": "node packages/cli/dist/main.js",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck && tsc -p tsconfig.tests.json",
+    "test": "pnpm build && vitest run",
+    "check": "pnpm build && pnpm typecheck && vitest run",
+    "test:webview": "pnpm --filter @vibe-spec/webview test:e2e",
+    "test:extension": "pnpm --filter vibe-spec test:integration",
+    "package:vsix": "pnpm --filter vibe-spec package"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "typescript": "6.0.3",
+    "vitest": "5.0.4"
+  }
+}

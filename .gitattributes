@@ -1,0 +1,6 @@
+* text=auto eol=lf
+# Retain synthetic import fixture bytes, including CSV CRLF records.
+packages/core/test/fixtures/import/items.csv -text
+*.xlsx -text
+*.png -text
+*.vsix -text

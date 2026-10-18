@@ -1,0 +1,21 @@
+primary_key: sku
+columns:
+  sku:
+    type: string
+  currency:
+    type: ref
+    table: items
+    on_delete: restrict
+    nullable: true
+  price:
+    type: decimal
+    minimum: "0"
+    maximum: "99999999999999999999999999"
+  count:
+    type: integer
+    minimum: "1"
+  available:
+    type: boolean
+    required: true
+unique:
+  - ["price"]

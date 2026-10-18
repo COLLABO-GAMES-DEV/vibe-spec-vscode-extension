@@ -1,0 +1,25 @@
+.plans-app { padding: 18px; max-width: 1400px; margin: auto; }
+.plans-toolbar, .plans-actions, .plans-list { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.plans-toolbar { justify-content: space-between; margin-bottom: 18px; }
+.plans-list { margin-bottom: 18px; }
+.plans-list button[aria-current] { outline: 2px solid var(--accent); outline-offset: 2px; }
+.plans-info, .plans-patches { border: 1px solid var(--line); padding: 14px; margin: 14px 0; }
+.plans-info h2 { font-size: 18px; }
+.plans-banner, .baseline-banner { background: var(--surface); border-left: 4px solid var(--accent); padding: 10px; }
+.baseline-banner { margin: 0; flex-shrink: 0; }
+.plans-scroll { overflow: auto; }
+.plans-app table { border-collapse: collapse; width: 100%; }
+.plans-app th, .plans-app td { border: 1px solid var(--line); padding: 10px; text-align: left; vertical-align: top; white-space: pre-wrap; min-width: 130px; overflow-wrap: anywhere; }
+.plans-app th { background: var(--surface); }
+.plans-app .plans-touched { background: var(--vscode-diffEditor-insertedTextBackground, #d9efdf); box-shadow: inset 3px 0 var(--accent); }
+.plans-error, .plans-warning { padding: 12px; border: 1px solid; margin: 12px 0; overflow-wrap: anywhere; }
+.plans-error { border-color: var(--vscode-inputValidation-errorBorder, #bd3030); }
+.plans-warning { border-color: var(--vscode-inputValidation-warningBorder, #a16b00); }
+.plans-diagnostics dl { display: grid; grid-template-columns: 90px 1fr; gap: 6px; }
+.plans-diagnostics dd { margin: 0; white-space: pre-wrap; }
+.plans-app pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+.plans-app summary { cursor: pointer; overflow-wrap: anywhere; }
+.plans-patches article + article { margin-top: 14px; }
+.plans-patches button { margin-top: 10px; }
+.plans-confirm { position: fixed; z-index: 30; inset: 20% auto auto 50%; transform: translateX(-50%); width: min(580px, 90vw); background: var(--vscode-editor-background, white); border: 2px solid var(--accent); padding: 22px; box-shadow: 0 8px 35px #0006; }
+.plans-confirm button { margin: 6px 8px 0 0; }

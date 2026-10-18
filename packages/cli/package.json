@@ -1,0 +1,16 @@
+{
+  "name": "@vibe-spec/cli",
+  "license": "UNLICENSED",
+  "repository": {"type": "git", "url": "https://github.com/COLLABO-GAMES-DEV/vibe-spec-vscode-extension.git", "directory": "packages/cli"},
+  "bugs": {"url": "https://github.com/COLLABO-GAMES-DEV/vibe-spec-vscode-extension/issues"},
+  "homepage": "https://github.com/COLLABO-GAMES-DEV/vibe-spec-vscode-extension#readme",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": { "vibe": "./dist/main.js" },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": { "@vibe-spec/core": "workspace:*" }
+}

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <title>vibe-spec table grid</title>
+  <rect width="256" height="256" rx="48" fill="#173247"/>
+  <rect x="44" y="52" width="168" height="152" rx="20" fill="#F2FAFC"/>
+  <rect x="52" y="60" width="152" height="136" rx="12" fill="#244B63"/>
+  <path d="M64 60h128a12 12 0 0 1 12 12v28H52V72a12 12 0 0 1 12-12Z" fill="#62DBC3"/>
+  <path d="M52 108h48v88H64a12 12 0 0 1-12-12Z" fill="#33768B"/>
+  <rect x="52" y="100" width="152" height="8" fill="#F2FAFC"/>
+  <rect x="52" y="148" width="152" height="8" fill="#F2FAFC"/>
+  <rect x="100" y="104" width="8" height="92" fill="#F2FAFC"/>
+</svg>

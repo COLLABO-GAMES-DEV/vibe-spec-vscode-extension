@@ -1,0 +1,9 @@
+**
+!package.json
+!README.md
+!media/vibe.svg
+!media/icon.png
+!dist/extension.cjs
+!dist/vibe.cjs
+!dist/webview/**
+!THIRD_PARTY_NOTICES.md
