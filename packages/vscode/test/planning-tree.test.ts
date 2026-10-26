@@ -324,6 +324,7 @@ suite('vibe-spec unified planning tree in native VS Code', function () {
     let observedFile: string;
     let observedBytes: string | undefined;
     let probeError: string | undefined;
+    const probeEvents: { file: string | undefined; bytes: string | undefined; error: string | undefined }[] = [];
     let observedDirectory: string;
     let observedRemoval = false;
     const errors: Error[] = [];
@@ -343,6 +344,8 @@ suite('vibe-spec unified planning tree in native VS Code', function () {
           observedBytes = undefined;
         }
       }
+      probeEvents.push({ file: observedFile, bytes: observedBytes, error: probeError });
+      if (probeEvents.length > 40) probeEvents.shift();
       if (observedDirectory) observedRemoval = !existsSync(observedDirectory);
     }, error => { errors.push(error); });
     async function observeBytes(file: string, bytes: string, action: () => Promise<unknown>, message: string) {
@@ -356,7 +359,7 @@ suite('vibe-spec unified planning tree in native VS Code', function () {
           return observedBytes === bytes;
         }, message);
       } catch (error) {
-        throw new Error(message + (probeError ? ': ' + probeError : ''), { cause: error });
+        throw new Error(message + (probeError ? ': ' + probeError : '') + '\nProbe events: ' + JSON.stringify(probeEvents) + '\nFinal file: ' + JSON.stringify(await readFile(file, 'utf8').catch(String)), { cause: error });
       }
       assert.equal(await readFile(file, 'utf8'), bytes);
     }

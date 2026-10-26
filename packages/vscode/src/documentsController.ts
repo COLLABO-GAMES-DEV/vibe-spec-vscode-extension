@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { realpath } from 'node:fs/promises';
 import { isAbsolute, join, relative } from 'node:path';
 import {
+  getTargetDocumentView, saveTargetDocumentSnapshots, createPlan, writeVariant, listPlans,
   addDocumentImage, compareResourceNames, createDocument, deleteDocument, editDocument, getDocumentView,
   listDocuments, loadProject, renameResource, resourceEntries, resourceFile, saveDocumentSnapshots, VibeError, whereUsed,
 } from '@vibe-spec/core';
@@ -17,6 +18,8 @@ interface DocumentPanel {
   readonly panel: vscode.WebviewPanel;
   readonly root: string;
   name: string;
+  target?: string;
+  scopes?: string[];
   focusPath: string | undefined;
   stateWork: Promise<void>;
   generation: number;
@@ -167,7 +170,7 @@ export class DocumentsController implements vscode.TreeDataProvider<vscode.TreeI
     const task = session.stateWork.then(async () => {
       if (!current()) return;
       const documents = listDocuments(project);
-      const view = documents.some(document => document.name === name) ? getDocumentView(project, name) : undefined;
+      const view = documents.some(document => document.name === name) ? getTargetDocumentView(project, name, session.target, session.scopes) : undefined;
       const assets = await this.assets(project, view, panel);
       if (!current()) return;
       this.post(session, { type: 'documentsState', revision: project.revision, documents, assets, replace,
@@ -323,12 +326,13 @@ export class DocumentsController implements vscode.TreeDataProvider<vscode.TreeI
       pending.received = true;
       if (!this.live(session)) { pending.reject(new VibeError('PROJECT_CHANGED', '기획 폴더가 바뀌었습니다.')); return; }
       if (message.type === 'documentSnapshotError') pending.reject(new VibeError('DOCUMENT_SNAPSHOT_FAILED', message.message));
-      else if (message.name !== session.name || typeof message.dirty !== 'boolean' || !Array.isArray(message.blocks)) {
+      else if ((message.target ?? 'base') !== (session.target ?? 'base') || message.name !== session.name || typeof message.dirty !== 'boolean' || !Array.isArray(message.blocks)) {
         pending.reject(new VibeError('INVALID_EDIT', '열린 문서의 저장 응답이 아닙니다.'));
       } else {
         session.dirty = message.dirty;
         this.draftChanged(this.key(root, session.name), session.dirty);
-        pending.resolve(message);
+        const { scopes: _requestedScopes, ...snapshot } = message;
+        pending.resolve({ ...snapshot, target: session.target ?? 'base', ...(session.scopes ? { scopes: session.scopes } : {}) });
       }
       return;
     }
@@ -342,12 +346,34 @@ export class DocumentsController implements vscode.TreeDataProvider<vscode.TreeI
       this.error(session, new VibeError('OPERATION_RUNNING', '저장이 끝난 뒤 다시 시도해 주세요.')); return;
     }
     if (!['ready', 'documentsRefresh', 'documentOpen', 'documentCreate', 'documentEdit', 'documentDelete',
-      'documentRename', 'documentImage', 'documentNavigate', 'documentUsage'].includes(message.type)) return;
+      'documentRename', 'documentImage', 'documentNavigate', 'documentUsage', 'documentTarget', 'documentVariantCreate'].includes(message.type)) return;
     const selection = session.generation;
     try {
       const project = await loadProject(root);
       if (!this.live(session) || selection !== session.generation) return;
       if (message.type === 'documentOpen') { await this.open(message.name, message.path); return; }
+      if (message.type === 'documentVariantCreate') {
+        if (session.dirty) throw new VibeError('UNSAVED_DRAFT', '먼저 초안을 저장하거나 버려 주세요.');
+        if (project.revision !== message.revision) throw new VibeError('STALE_REVISION', '기획 파일이 바뀌었습니다.');
+        const variantError = resourceNameError(message.variant);
+        if (variantError || message.variant === '_plan') throw new VibeError('NAME_INVALID', variantError ?? '예약된 이름입니다.');
+        const existing = listPlans(project).find(p => p.name === message.plan);
+        if (existing?.variants.includes(message.variant)) throw new VibeError('NAME_EXISTS', '이미 있는 대안입니다.');
+        const created = existing ? project : (await createPlan(root, project.revision, message.plan, { title: message.plan, status: 'draft' })).project;
+        this.requireRoot(root);
+        const result = await writeVariant(root, created.revision, message.plan, message.variant, {});
+        if (!this.live(session) || selection !== session.generation) return;
+        session.target = message.plan + '/' + message.variant; delete session.scopes;
+        await this.refreshProject(); await this.state(session, result.project, true); return;
+      }
+      if (message.type === 'documentTarget') {
+        if (session.dirty) throw new VibeError('UNSAVED_DRAFT', '초안을 저장하거나 버린 뒤 편집 대상을 바꾸세요.');
+        getTargetDocumentView(project, session.name, message.target, message.scopes);
+        session.target = message.target;
+        if (message.scopes) session.scopes = message.scopes; else delete session.scopes;
+        await this.state(session, project, true); return;
+      }
+      if (session.target && session.target !== 'base' && ['documentRename', 'documentDelete', 'documentEdit'].includes(message.type)) throw new VibeError('DOCUMENT_SCOPE', '대안 본문 저장만 지원합니다. 이름 변경과 삭제는 기준안에서 실행하세요.');
       if (message.type === 'documentNavigate') {
         if (typeof message.path !== 'string') throw new VibeError('PATH_INVALID', '이동할 경로를 선택해 주세요.');
         if (/^(?:https?:|mailto:)/i.test(message.path)) await vscode.env.openExternal(vscode.Uri.parse(message.path));
@@ -454,7 +480,7 @@ export class DocumentsController implements vscode.TreeDataProvider<vscode.TreeI
       await beforeWrite();
       this.requireRoot(root);
       if (sessions.some(session => !this.live(session))) throw new VibeError('DOCUMENT_CLOSED', '저장 중 문서가 닫혔습니다.');
-      if (dirty.length) written = await saveDocumentSnapshots(root, project.revision, dirty.map(({ name, blocks }) => ({ name, blocks })), {});
+      if (dirty.length) written = await saveTargetDocumentSnapshots(root, project.revision, dirty.map(({ name, blocks, target, scopes }) => ({ name, blocks, ...(target ? { target } : {}), ...(scopes ? { scopes } : {}) })), {});
       // A successful file write is acknowledged even if a later Git commit fails.
       const baseline = written?.planned ?? project;
       await Promise.all(sessions.map(session => {
@@ -462,7 +488,7 @@ export class DocumentsController implements vscode.TreeDataProvider<vscode.TreeI
         // Drain older watcher states before rebaselining this frame. Later
         // watcher replies must queue after this acknowledgement as well.
         const task = session.stateWork.then(async () => {
-          const view = listDocuments(baseline).some(document => document.name === session.name) ? getDocumentView(baseline, session.name) : undefined;
+          const view = listDocuments(baseline).some(document => document.name === session.name) ? getTargetDocumentView(baseline, session.name, session.target, session.scopes) : undefined;
           const state: DocumentsState = { type: 'documentsState', revision: baseline.revision,
             documents: listDocuments(baseline), ...(view ? { view } : {}), assets: await this.assets(baseline, view, session.panel), replace: true };
           session.dirty = false;

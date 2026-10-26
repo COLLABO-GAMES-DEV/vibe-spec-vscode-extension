@@ -1,10 +1,11 @@
+import { replaceTestFile } from './replaceTestFile.js';
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import fs, { cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import * as vscode from 'vscode';
-import { getGitStatus, loadProject, type DocumentSnapshotBlock, type DocumentView, type Project } from '@vibe-spec/core';
+import { createPlan, writeVariant, getPlan, approvePlan, getGitStatus, loadProject, type DocumentSnapshotBlock, type DocumentView, type Project } from '@vibe-spec/core';
 import type { DocumentsClientMessage, DocumentsHostMessage, DocumentsState } from '../../webview/src/documentsProtocol.js';
 const exec = promisify(execFile);
 const git = async (root: string, ...args: string[]) => (await exec('git', ['-C', root, ...args])).stdout.trim();
@@ -24,7 +25,7 @@ async function eventually(check: () => boolean | Promise<boolean>, message = 'Na
 // with an independently held draft and responds only when the host asks to flush.
 function bridge(panel: vscode.WebviewPanel) {
   const messages: DocumentsHostMessage[] = [];
-  let draft: { name: string; revision: string; dirty: boolean; blocks: DocumentSnapshotBlock[] } | undefined;
+  let draft: { name: string; revision: string; dirty: boolean; target?: string; blocks: DocumentSnapshotBlock[] } | undefined;
   let onFlush: (() => void | Promise<void>) | undefined;
   let respond = true;
   const listener = panel.webview.onDidReceiveMessage(async message => {
@@ -39,7 +40,7 @@ function bridge(panel: vscode.WebviewPanel) {
     if (value.type === 'documentFlushResult' && value.ok && value.state) baseline(value.state);
   });
   function baseline(state: DocumentsState) {
-    if (state.view) draft = { name: state.view.name, revision: state.revision, dirty: false,
+    if (state.view) draft = { name: state.view.name, revision: state.revision, dirty: false, ...('target' in state.view ? { target: state.view.target } : {}),
       blocks: state.view.blocks.map(block => ({ original: block.index })) };
   }
   const send = (message: DocumentsClientMessage) => panel.webview.postMessage({ type: 'saveNativeSend', message });
@@ -102,6 +103,31 @@ suite('native whole-document save with reason', function () {
   async function result(page: ReturnType<typeof bridge>, ok: boolean) {
     await eventually(() => page.messages.some(message => message.type === 'documentFlushResult' && message.ok === ok));
   }
+
+  test('alternative document save uses the real host, leaves baseline bytes and shows external base changes', async () => {
+    let p = await loadProject(root);
+    p = (await createPlan(root, p.revision, 'doc-review', { title: 'Document review', status: 'review' })).project;
+    p = (await writeVariant(root, p.revision, 'doc-review', 'A', { documents: { '첫 문서/제목': source.slice(1) } })).project;
+    await api.refresh();
+    const page = await open();
+    await page.send({ type: 'documentTarget', target: 'doc-review/A' });
+    await eventually(() => page.messages.some(m => m.type === 'documentsState' && m.view && 'target' in m.view && m.view.target === 'doc-review/A'));
+    const state = [...page.messages].reverse().find(m => m.type === 'documentsState' && m.view && 'target' in m.view && m.view.target === 'doc-review/A') as DocumentsState;
+    // The transport client holds its draft separately, just like the React editor.
+    Object.assign(page.draft, { revision: state.revision, target: 'doc-review/A' });
+    page.edit('대안 본문');
+    await page.send({ type: 'documentSaveRequest', reason: '문서 대안만 저장' });
+    await result(page, true);
+    assert.deepEqual(await bytes(), Buffer.from(source));
+    p = await loadProject(root); assert.match(getPlan(p, 'doc-review').variants.A!.documents!['첫 문서/제목']!, /대안 본문/);
+    const replacement = join(root, 'external-document.tmp');
+    await writeFile(replacement, source.replace('원문', '외부 수정'));
+    await replaceTestFile(replacement, join(root, 'documents', '첫 문서.md'));
+    await api.refresh();
+    await eventually(() => page.messages.some(m => m.type === 'documentsState' && m.view?.diagnostics.some(d => d.code === 'BASE_CHANGED')));
+    p = await loadProject(root); await approvePlan(root, p.revision, 'doc-review', 'A');
+    assert.deepEqual(await bytes(), Buffer.from(source.replace('원문  ', '대안 본문')));
+  });
 
   test('save request queries every frame even before dirty signals, batches two documents and commits the reason', async () => {
     const first = await open(), second = await open('둘 문서');

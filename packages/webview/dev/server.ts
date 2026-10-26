@@ -74,7 +74,7 @@ export function fakeHostServer(): Plugin {
           }
           if (url.pathname === '/__vibe/tables') { response.end(JSON.stringify(await tableEditor.handle(body))); return; }
           if (url.pathname === '/__vibe/documents') { response.end(JSON.stringify(await documents.handle(body))); return; }
-          if (url.pathname === '/__vibe/documents/fixture') { response.end(JSON.stringify(await documents.fixture(typeof body.source === 'string' ? body.source : undefined))); return; }
+          if (url.pathname === '/__vibe/documents/fixture') { response.end(JSON.stringify(await documents.fixture(typeof body.source === 'string' ? body.source : undefined, body.variants === true))); return; }
           if (url.pathname === '/__vibe/plans') { response.end(JSON.stringify(await plans.handle(body))); return; }
           if (url.pathname === '/__vibe/plans/fixture') { response.end(JSON.stringify(await plans.fixture())); return; }
           if (url.pathname === '/__vibe/git' || url.pathname === '/__vibe/git/fixture') {

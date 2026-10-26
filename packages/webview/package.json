@@ -1,10 +1,16 @@
 {
   "name": "@vibe-spec/webview",
   "license": "UNLICENSED",
-  "repository": {"type": "git", "url": "https://github.com/COLLABO-GAMES-DEV/vibe-spec-vscode-extension.git", "directory": "packages/webview"},
-  "bugs": {"url": "https://github.com/COLLABO-GAMES-DEV/vibe-spec-vscode-extension/issues"},
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/COLLABO-GAMES-DEV/vibe-spec-vscode-extension.git",
+    "directory": "packages/webview"
+  },
+  "bugs": {
+    "url": "https://github.com/COLLABO-GAMES-DEV/vibe-spec-vscode-extension/issues"
+  },
   "homepage": "https://github.com/COLLABO-GAMES-DEV/vibe-spec-vscode-extension#readme",
-  "version": "0.7.1",
+  "version": "0.8.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -22,6 +28,7 @@
     "@tanstack/react-virtual": "3.14.19",
     "@vibe-spec/core": "workspace:*",
     "decimal.js": "10.6.0",
+    "diff": "7.0.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "react-markdown": "^10.1.0",

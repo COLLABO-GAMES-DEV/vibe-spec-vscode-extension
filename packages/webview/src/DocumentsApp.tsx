@@ -1,15 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
-import type { DocumentView, Usages } from '@vibe-spec/core';
+import type { TargetDocumentView, DocumentView, Usages } from '@vibe-spec/core';
 import type { DocumentsClientMessage, DocumentsHost, DocumentsState } from './documentsProtocol';
 import { DocumentEditor, type DocumentEditorHandle } from './DocumentEditor';
 import './documents.css';
 
 type Management = { kind: 'rename' | 'delete'; name: string; revision: string; value: string; confirmed: boolean };
 type Screen = { state?: DocumentsState; active?: { view: DocumentView; revision: string } | undefined; dirty: boolean;
+  discard?: boolean; epoch?: number;
   firstHeading: boolean; pending?: 'manage' | 'image' | undefined; flush?: string | undefined;
   error?: string | undefined; management?: Management | undefined; usages?: { path: string; usages: Usages } | undefined };
 const displayValue = (value: unknown): string => typeof value === 'string' ? value : value === undefined ? '' : JSON.stringify(value);
 export function DocumentsApp({ host }: { host: DocumentsHost }) {
+  const [planName, setPlanName] = useState('');
+  const [variantName, setVariantName] = useState('A');
   const [screen, setScreen] = useState<Screen>({ dirty: false, firstHeading: false });
   const current = useRef(screen);
   const editor = useRef<DocumentEditorHandle | undefined>(undefined);
@@ -27,7 +30,7 @@ export function DocumentsApp({ host }: { host: DocumentsHost }) {
           const snapshot = editor.current.snapshot();
           update(previous => ({ ...previous, flush: message.requestId, error: undefined }));
           host.send({ type: 'documentSnapshot', requestId: message.requestId, name: active.view.name,
-            revision: active.revision, ...snapshot });
+            revision: active.revision, ...('target' in active.view ? { target: (active.view as TargetDocumentView).target } : {}), ...snapshot });
         } catch (error) {
           update(previous => ({ ...previous, error: String(error) }));
           host.send({ type: 'documentSnapshotError', requestId: message.requestId, message: String(error) });
@@ -85,6 +88,12 @@ export function DocumentsApp({ host }: { host: DocumentsHost }) {
   }, [host]);
   const { state, active, dirty, pending, flush, management, error } = screen;
   const view = active?.view;
+  const targetView = view && 'target' in view ? view as TargetDocumentView : undefined;
+  const isVariant = targetView && targetView.target !== 'base';
+  const allowedBlocks = isVariant ? view!.blocks.filter(block => targetView.selectedScopes.some(path => {
+    const scope = targetView.scopes.find(s => s.path === path);
+    return scope && (block.start >= scope.start || block.path === path) && block.end <= scope.end;
+  })).map(b => b.index) : undefined;
   const busy = Boolean(pending || flush);
   const stale = Boolean(dirty && active && state && active.revision !== state.revision);
   function send(message: DocumentsClientMessage) {
@@ -149,14 +158,43 @@ export function DocumentsApp({ host }: { host: DocumentsHost }) {
         <span className="document-save-state">{dirty ? '저장하지 않은 변경' : ''}</span>
         <button disabled={busy} onClick={() => host.send({ type: 'documentSaveRequest' })}>변경 사유와 함께 저장</button>
         <details className="document-menu"><summary aria-label="문서 메뉴">⋯</summary><div className="document-menu-items">
-          <button disabled={busy || dirty} onClick={() => manage('rename')}>문서 이름 바꾸기</button>
-          <button disabled={busy || dirty} onClick={() => manage('delete')}>문서 삭제</button>
+          <button disabled={busy || dirty || Boolean(isVariant)} onClick={() => manage('rename')}>문서 이름 바꾸기</button>
+          <button disabled={busy || dirty || Boolean(isVariant)} onClick={() => manage('delete')}>문서 삭제</button>
           <button onClick={() => host.send({ type: 'documentUsage', path: view.name })}>문서 사용처</button>
           <button disabled={busy} onClick={() => host.send({ type: 'documentsRefresh' })}>문서 새로 고침</button>
         </div></details>
       </header>
+      {targetView && <section className="document-target" aria-label="문서 편집 대상">
+        <strong>편집 대상: {isVariant ? targetView.target : '기준안'}</strong>
+        <label>대상 선택<select aria-label="문서 편집 대상 선택" value={targetView.target} disabled={busy || dirty}
+          onChange={event => send({ type: 'documentTarget', target: event.target.value })}>
+          {targetView.targets.map(target => <option key={target} value={target}>{target === 'base' ? '기준안' : target}</option>)}
+        </select></label>
+        <details><summary>새 기획·대안 만들기</summary><form onSubmit={event => { event.preventDefault();
+          send({ type: 'documentVariantCreate', plan: planName, variant: variantName, revision: active!.revision }); }}>
+          <label>기획 이름<input aria-label="기획 이름" value={planName} onChange={event => setPlanName(event.target.value)} /></label>
+          <label>대안 이름<input aria-label="대안 이름" value={variantName} onChange={event => setVariantName(event.target.value)} /></label>
+          <button disabled={busy || dirty || !planName.trim() || !variantName.trim()}>대안 만들기</button>
+        </form></details>
+        {isVariant && <details open><summary>쟁점 범위 선택</summary>
+          <p>선택 범위 밖은 기준안에서 상속합니다. 목록·표만 따로 선택할 수 없습니다. 저장된 범위 제거는 CLI plan variant에서 변경분을 제외합니다.</p>
+          {targetView.scopes.map(scope => <label key={scope.path} className="document-scope-option">
+            <input type="checkbox" title={targetView.persistedScopes.includes(scope.path) ? "이미 저장한 변경 범위입니다" : undefined} disabled={busy || dirty || targetView.persistedScopes.includes(scope.path)} checked={targetView.selectedScopes.includes(scope.path)}
+              onChange={event => send({ type: 'documentTarget', target: targetView.target, scopes: event.target.checked
+                ? [...targetView.selectedScopes, scope.path] : targetView.selectedScopes.filter(path => path !== scope.path) })} />
+            {scope.path} ({scope.kind === 'document' ? '문서 전체' : scope.kind === 'section' ? '섹션' : '이름표 문단'})
+          </label>)}
+        </details>}
+        {dirty && <><p>대상이나 범위를 바꾸려면 초안을 저장하거나 버려 주세요.</p>
+          <button disabled={busy} onClick={() => update(previous => ({ ...previous, discard: true }))}>초안 버리기</button></>}
+        {screen.discard && <section role="dialog" aria-label="초안 버리기 확인"><p>저장하지 않은 초안을 버릴까요?</p>
+          <button onClick={() => update(previous => ({ ...previous, discard: false }))}>유지</button>
+          <button onClick={() => { update(previous => ({ ...previous, discard: false, dirty: false, error: undefined,
+            epoch: (previous.epoch ?? 0) + 1, active: previous.state?.view ? { view: previous.state.view, revision: previous.state.revision } : undefined }));
+            host.send({ type: 'documentDraft', dirty: false }); }}>버리고 현재 파일 읽기</button></section>}
+      </section>}
       <section className="document-blocks" aria-label="문서 본문">
-        <DocumentEditor key={view.name} view={view} assets={state.assets} disabled={busy} focusPath={state.focusPath}
+        <DocumentEditor key={JSON.stringify([view.name, targetView?.target, targetView?.selectedScopes, screen.epoch])} allowedBlocks={allowedBlocks} lockedHeadings={isVariant ? targetView.selectedScopes.filter(path => targetView.scopes.some(s => s.path === path && s.kind === 'section')) : []} view={view} assets={state.assets} disabled={busy} focusPath={state.focusPath}
           handleRef={editor} uploadImage={uploadImage} navigate={navigate}
           onError={message => update(previous => ({ ...previous, error: message }))}
           onChange={(nextDirty, firstHeading) => {

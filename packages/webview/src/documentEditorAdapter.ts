@@ -36,6 +36,10 @@ export class DocumentEditorAdapter<B extends SourceBlock> {
     this.emptyId = this.groups.length === 0 && blocks.length === 1 ? blocks[0]!.id : undefined;
     this.baseline = this.identity(blocks);
   }
+  protectedIds(allowed: number[]): Set<string> {
+    const ids = (block: B): string[] => [block.id, ...block.children.flatMap(child => ids(child as B))];
+    return new Set(this.groups.filter(g => !allowed.includes(g.source.index)).flatMap(g => g.members.flatMap(ids)));
+  }
   private identity(blocks: B[]): string {
     return JSON.stringify(blocks.map(block => [block.id, contentIdentity(block)]));
   }

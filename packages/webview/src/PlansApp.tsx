@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { diffLines } from 'diff';
+import { useEffect, useMemo, useState } from 'react';
 import type { PlanValue, PlanView, Variant } from '@vibe-spec/core';
 import { planStatusLabels, type PlansClientMessage, type PlansHost, type PlansState } from './plansProtocol';
 import './plans.css';
@@ -11,9 +12,17 @@ function cellText(cell: PlanValue): string { return cell.present ? valueText(cel
 // come from core's comparison, including values inherited from the baseline.
 function touched(variant: Variant | undefined, path: string): boolean {
   if (!variant) return false;
-  return Object.hasOwn(variant.set ?? {}, path)
+  return Object.hasOwn(variant.documents ?? {}, path) || Object.hasOwn(variant.set ?? {}, path)
     || Object.keys(variant.add ?? {}).some(row => path === row || path.startsWith(row + '/'))
     || (variant.remove ?? []).some(row => path === row || path.startsWith(row + '/'));
+}
+function DocumentDifference({ before, after }: { before: string; after: string }) {
+  const changes = useMemo(() => diffLines(before, after, { timeout: 100 }), [before, after]);
+  if (!changes) return <><pre>{after}</pre><small>비교량이 커서 전체 원문을 표시합니다.</small></>;
+  const removed = changes.filter(change => change.removed).map(change => change.value).join('');
+  return <><pre>{changes.map((change, index) => change.removed ? null : change.added
+    ? <mark key={index} data-testid="document-added-lines">{change.value}</mark> : <span key={index}>{change.value}</span>)}</pre>
+    {removed && <details><summary>삭제된 줄</summary><pre><del>{removed}</del></pre></details>}</>;
 }
 type Screen = { state?: PlansState; opened?: PlanView | undefined; busy: boolean; error?: string | undefined; confirm?: string | undefined };
 
@@ -75,10 +84,10 @@ export function PlansApp({ host }: { host: PlansHost }) {
       <div className="plans-scroll"><table aria-label="기준안과 대안 비교">
         <thead><tr><th scope="col">경로</th><th scope="col">기준안</th>{view.plan.variants.map(name => <th scope="col" key={name}>{name}안</th>)}</tr></thead>
         <tbody>{view.comparison.map(row => <tr key={row.path}>
-          <th scope="row"><code>{row.path}</code></th><td>{cellText(row.baseline)}</td>
+          <th scope="row"><code>{row.path}</code></th><td><pre>{cellText(row.baseline)}</pre></td>
           {view.plan.variants.map(name => <td key={name} data-touched={touched(view.variants[name], row.path)}
             className={touched(view.variants[name], row.path) ? 'plans-touched' : undefined}>
-            {row.alternatives[name] ? cellText(row.alternatives[name]!) : '없음'}
+            {row.kind === 'document' ? <DocumentDifference before={cellText(row.baseline)} after={row.alternatives[name] ? cellText(row.alternatives[name]!) : '없음'} /> : <pre>{row.alternatives[name] ? cellText(row.alternatives[name]!) : '없음'}</pre>}
           </td>)}
         </tr>)}</tbody>
       </table></div>
@@ -88,14 +97,14 @@ export function PlansApp({ host }: { host: PlansHost }) {
           const row = view.comparison.find(row => row.path === diagnostic.path);
           const variant = view.plan.variants.find(name => diagnostic.file === `plans/${view.plan.name}/${name}.yaml`);
           const patch = variant ? view.variants[variant] : undefined;
-          const old = patch && Object.hasOwn(patch.base_values, diagnostic.path)
+          const old = patch?.document_base_values && Object.hasOwn(patch.document_base_values, diagnostic.path) ? patch.document_base_values[diagnostic.path] : patch && Object.hasOwn(patch.base_values, diagnostic.path)
             ? valueText(patch.base_values[diagnostic.path]) : patch?.base_missing.includes(diagnostic.path) ? '없음' : undefined;
           return <article key={index} className={diagnostic.severity === 'warning' ? 'plans-warning' : 'plans-error'}>
             <strong>{diagnostic.severity === 'warning' ? '경고' : '오류'} · {diagnostic.code}</strong>
             <p><code>{diagnostic.file} · {diagnostic.path}</code></p><p>{diagnostic.message}</p>
             {diagnostic.severity === 'warning' && row && variant && old !== undefined && <dl>
-              <dt>이전 기준</dt><dd>{old}</dd><dt>현재 기준</dt><dd>{cellText(row.baseline)}</dd>
-              <dt>{variant}안</dt><dd>{cellText(row.alternatives[variant]!)}</dd>
+              <dt>이전 기준</dt><dd><pre>{old}</pre></dd><dt>현재 기준</dt><dd><pre>{cellText(row.baseline)}</pre></dd>
+              <dt>{variant}안</dt><dd><pre>{cellText(row.alternatives[variant]!)}</pre></dd>
             </dl>}
           </article>;
         })}

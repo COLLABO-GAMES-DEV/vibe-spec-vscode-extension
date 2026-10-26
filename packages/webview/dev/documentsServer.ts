@@ -1,4 +1,4 @@
-import { createDocument, deleteDocument, editDocument, getDocumentView, listDocuments, loadProject,
+import { getTargetDocumentView, saveTargetDocumentSnapshots, createPlan, writeVariant, listPlans, resourceNameError, createDocument, deleteDocument, editDocument, getDocumentView, listDocuments, loadProject,
   renameResource, whereUsed, addDocumentImage, readPath, resourceFile, saveDocumentSnapshots, getGitStatus, saveProject, VibeError } from '@vibe-spec/core';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -18,16 +18,17 @@ export function createDocumentsServer(root: () => string) {
   const pending = new Map<string, { requestId: string; root: string; name: string; revision: string; expires: number }>();
   let saving = false;
   const selected = new Map<string,string>();
+  const targets = new Map<string, { target: string; scopes?: string[] }>();
   async function state(client: string, replace = false, focusPath?: string, baseline?: Project): Promise<Extract<DocumentsHostMessage, { type: 'documentsState' }>> {
     const project = baseline ?? await loadProject(root()), name = selected.get(client);
     const assets = Object.fromEntries([...(project.assets ?? [])].map(([file,bytes]) => [file.slice(10),
       'data:image/' + (file.endsWith('.jpg') ? 'jpeg' : file.split('.').at(-1)) + ';base64,' + Buffer.from(bytes).toString('base64')]));
     return { type:'documentsState', revision:project.revision, documents:listDocuments(project), assets,replace,
-      ...(name && resourceFile(project,'document',name) ? {view:getDocumentView(project,name)} : {}), ...(focusPath ? {focusPath}: {}) };
+      ...(name && resourceFile(project,'document',name) ? {view:getTargetDocumentView(project,name,targets.get(client)?.target,targets.get(client)?.scopes)} : {}), ...(focusPath ? {focusPath}: {}) };
   }
   return {
-    reset() { selected.clear(); pending.clear(); },
-    async fixture(source?: string) {
+    reset() { selected.clear(); pending.clear(); targets.clear(); },
+    async fixture(source?: string, variants = false) {
       let project = await loadProject(root());
       const name = '기획 문서';
       if (resourceFile(project,'document',name)) project = (await deleteDocument(root(),project.revision,name)).project;
@@ -35,6 +36,11 @@ export function createDocumentsServer(root: () => string) {
       project = await loadProject(root());
       const markdown = source ?? '# 기획\n\n원문 **강조**  유지 👋\n\n<!-- name: 보상 -->\n[아이템](items/currency_gold/name)\n\n- 하나\n- 둘\n\n| 이름 | 값 |\n| --- | --- |\n| 확률 | 12.5000 |\n\n- [ ] 확인\n\n> 인용문\n\n```text\n코드\n```\n\n![그림]('+image.path+')\n\n<aside>보존할 원문</aside>';
       const result = await createDocument(root(),project.revision,name,markdown);
+      if (variants) {
+        let p = (await createPlan(root(), result.project.revision, 'document-review', { title: '문서 대안 시험', status: 'review' })).project;
+        p = (await writeVariant(root(), p.revision, 'document-review', 'A', {})).project;
+        await writeVariant(root(), p.revision, 'document-review', 'B', {});
+      }
       // Only this disposable browser fixture configures an identity.
       await git(root(), 'init', '-b', 'main');
       await git(root(), 'config', 'user.name', 'Browser Test');
@@ -74,7 +80,7 @@ export function createDocumentsServer(root: () => string) {
             if (message.dirty && message.revision !== project.revision) throw new VibeError('STALE_REVISION', '문서 편집 중 파일이 바뀌었습니다.');
             if ((await getGitStatus(saveRoot)).revision !== prepared.revision) throw new VibeError('STALE_REVISION', '파일이나 Git 상태가 바뀌었습니다.');
             if (root() !== saveRoot) throw new VibeError('PROJECT_CHANGED', '기획 폴더가 바뀌었습니다.');
-            if (message.dirty) written = await saveDocumentSnapshots(saveRoot, project.revision, [{ name: message.name, blocks: message.blocks }], {});
+            if (message.dirty) written = await saveTargetDocumentSnapshots(saveRoot, project.revision, [{ name: message.name, blocks: message.blocks, ...targets.get(client) }], {});
             let commitRevision = prepared.revision;
             if (written) {
               const afterStatus = await getGitStatus(saveRoot), afterFence = await fence(afterStatus);
@@ -99,6 +105,21 @@ export function createDocumentsServer(root: () => string) {
           } finally { saving = false; }
         }
         let project = await loadProject(root());
+        if (message.type === 'documentVariantCreate') {
+          if (message.revision !== project.revision) throw new VibeError('STALE_REVISION', '기획 파일이 바뀌었습니다.');
+          if (resourceNameError(message.variant) || message.variant === '_plan') throw new VibeError('NAME_INVALID', '대안 이름을 확인해 주세요.');
+          const existing = listPlans(project).find(p => p.name === message.plan);
+          if (existing?.variants.includes(message.variant)) throw new VibeError('NAME_EXISTS', '이미 있는 대안입니다.');
+          if (!existing) project = (await createPlan(root(), project.revision, message.plan, { title: message.plan, status: 'draft' })).project;
+          await writeVariant(root(), project.revision, message.plan, message.variant, {});
+          targets.set(client, { target: message.plan + '/' + message.variant });
+          return state(client, true);
+        }
+        if (message.type === 'documentTarget') {
+          const name = selected.get(client)!; getTargetDocumentView(project, name, message.target, message.scopes);
+          targets.set(client, { target: message.target, ...(message.scopes ? { scopes: message.scopes } : {}) });
+          return state(client, true);
+        }
         if (message.type === 'documentOpen') { getDocumentView(project,message.name); selected.set(client,message.name); }
         else if (message.type === 'ready' && typeof raw.name === 'string') selected.set(client,raw.name);
         else if (message.type === 'documentCreate') {

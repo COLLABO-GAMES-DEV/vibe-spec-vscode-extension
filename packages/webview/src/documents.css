@@ -44,3 +44,8 @@
 .document-current { margin: 12px 0; }
 .document-current summary { cursor: pointer; padding: 6px 0; }
 .document-current pre { padding: 12px; background: var(--surface); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 360px; overflow: auto; }
+
+.document-target { border: 1px solid var(--vscode-panel-border, #777); padding: 12px; margin-bottom: 12px; }
+.document-target strong { display: block; font-size: 1.1rem; margin-bottom: 8px; }
+.document-scope-option { display: block; margin: 4px 0; }
+.document-inherited { opacity: .65; background: var(--vscode-editor-inactiveSelectionBackground, #7772); }

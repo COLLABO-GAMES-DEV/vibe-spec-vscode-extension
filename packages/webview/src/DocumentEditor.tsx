@@ -23,14 +23,16 @@ function MarkdownToolbar() {
     <BasicTextStyleButton basicTextStyle="strike" /><BasicTextStyleButton basicTextStyle="code" /><CreateLinkButton />
   </FormattingToolbar>;
 }
-export function DocumentEditor({ view, assets, disabled, focusPath, handleRef, onChange, onError, uploadImage, navigate }: {
+export function DocumentEditor({ view, assets, disabled, focusPath, allowedBlocks, lockedHeadings, handleRef, onChange, onError, uploadImage, navigate }: {
   view: DocumentView; assets: Record<string, string>; disabled: boolean; focusPath?: string | undefined;
+  lockedHeadings?: string[] | undefined;
+  allowedBlocks?: number[] | undefined;
   handleRef: RefObject<DocumentEditorHandle | undefined>;
   onChange: (dirty: boolean, firstHeading: boolean) => void; onError: (message: string) => void;
   uploadImage: (file: File) => Promise<string>; navigate: (path: string) => void;
 }) {
-  const callbacks = useRef({ assets, onChange, onError, uploadImage, navigate });
-  callbacks.current = { assets, onChange, onError, uploadImage, navigate };
+  const callbacks = useRef({ lockedHeadings, allowedBlocks, assets, onChange, onError, uploadImage, navigate });
+  callbacks.current = { lockedHeadings, allowedBlocks, assets, onChange, onError, uploadImage, navigate };
   const [loaded, setLoaded] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   const composing = useRef(false);
@@ -60,7 +62,15 @@ export function DocumentEditor({ view, assets, disabled, focusPath, handleRef, o
       // Source gaps belong to core; serializer terminators must not accumulate there.
       blocks => editor.blocksToMarkdownLossy(blocks).replace(/\n+$/, ''));
     adapter.current = source;
-    const notify = () => callbacks.current.onChange(source.dirty(editor.document), source.firstHeading(editor.document));
+    const notify = () => {
+      callbacks.current.onChange(source.dirty(editor.document), source.firstHeading(editor.document));
+      const protectedIds = callbacks.current.allowedBlocks ? source.protectedIds(callbacks.current.allowedBlocks) : new Set<string>();
+      requestAnimationFrame(() => {
+        editor.domElement?.querySelectorAll<HTMLElement>('[data-id]').forEach(element => {
+          element.classList.toggle('document-inherited', protectedIds.has(element.dataset.id ?? ''));
+        });
+      });
+    };
     try {
       const blocks = source.prepare(view);
       editor.transact(transaction => {
@@ -72,6 +82,21 @@ export function DocumentEditor({ view, assets, disabled, focusPath, handleRef, o
       setLoaded(true);
       notify();
     } catch (error) { callbacks.current.onError(String(error)); }
+    const before = editor.onBeforeChange(({ getChanges }) => {
+      if (syncing.current || callbacks.current.allowedBlocks === undefined) return;
+      const protectedIds = source.protectedIds(callbacks.current.allowedBlocks);
+      const changes = getChanges();
+      const anchors = new Set((callbacks.current.lockedHeadings ?? []).map(path => source.pathId(path)));
+      if (changes.some(change => anchors.has(change.block.id) && (change.type === 'delete' || change.type === 'move' ||
+        change.type === 'update' && (change.block.type !== 'heading' || JSON.stringify(change.block.content) !== JSON.stringify(change.prevBlock.content))))) {
+        callbacks.current.onError('선택한 섹션 제목은 유지해 주세요. 주소 이름 변경은 기준안에서 합니다.'); return false;
+      }
+      const cursor = editor.getTextCursorPosition().block.id;
+      if (changes.some(change => protectedIds.has(change.block.id) || change.type === 'insert' && protectedIds.has(cursor))) {
+        callbacks.current.onError('기준안에서 상속한 부분입니다. 편집할 범위를 먼저 선택해 주세요.');
+        return false;
+      }
+    });
     const off = editor.onChange(() => { if (!syncing.current) notify(); });
     handleRef.current = {
       snapshot: () => {
@@ -84,7 +109,7 @@ export function DocumentEditor({ view, assets, disabled, focusPath, handleRef, o
       },
       unlock: () => { locked.current = false; },
     };
-    return () => { off(); handleRef.current = undefined; };
+    return () => { before(); off(); handleRef.current = undefined; };
     // This initializes once per document; subsequent source revisions rebaseline below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor]);

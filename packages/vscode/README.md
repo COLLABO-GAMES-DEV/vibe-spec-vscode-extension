@@ -6,7 +6,7 @@
 
 게임 기획 테이블과 문서를 VS Code에서 편집하고 Git으로 함께 관리합니다. YAML 테이블과 Markdown 문서를 원본으로 사용하며, 화면과 CLI에서 같은 데이터와 검증 규칙으로 작업합니다.
 
-확장 ID: `ijun17.vibe-spec` · 버전: **0.7.1**
+확장 ID: `ijun17.vibe-spec` · 버전: **0.8.0**
 
 <!-- Screenshot placeholder: a table with fictional sample data, the table sidebar, and a validation error. -->
 
@@ -14,7 +14,7 @@
 
 표 화면을 사용하려면 **VS Code 1.140 이상**과 **시스템 Git**이 필요합니다. CLI나 Codex로 작업할 때는 **Node.js 24 이상**도 설치하세요.
 
-1. VS Code 확장에서 `ijun17.vibe-spec`을 찾아 설치합니다. VSIX 파일이 있다면 확장 화면의 `…` → **Install from VSIX…**에서 `vibe-spec-0.7.1.vsix`를 선택합니다.
+1. VS Code 확장에서 `ijun17.vibe-spec`을 찾아 설치합니다. VSIX 파일이 있다면 확장 화면의 `…` → **Install from VSIX…**에서 `vibe-spec-0.8.0.vsix`를 선택합니다.
 2. 로컬 프로젝트 폴더를 열고 왼쪽 **vibe-spec** 아이콘을 누릅니다.
 3. 기존 데이터가 있으면 **기획 폴더 선택**, 처음 시작하면 빈 폴더에서 **새 기획 폴더 초기화**를 선택합니다.
 4. **새 테이블**로 이름과 Key 열을 정하거나 **불러오기**로 CSV·TSV·XLSX를 가져옵니다. 사이드바에서 테이블을 눌러 편집합니다.
@@ -117,3 +117,9 @@ vibe export --output "./review-tables" --project "/path/to/planning" --json
 <!-- Screenshot placeholder: document block editing and a linked table cell, with fictional content only. -->
 
 XLSX의 정수 숫자 셀은 `1.0` 대신 `1`로 이관하므로 화면·CLI·내보내기가 같은 값을 봅니다. 숫자처럼 보이는 텍스트 셀과 소수 값은 원문 그대로입니다. 이관 행은 시트 순서를 유지하며, 표에서 정렬해도 파일 순서는 바뀌지 않습니다.
+
+## 문서 기획 A/B 비교
+
+문서를 연 뒤 **새 기획·대안 만들기**에서 기획 이름과 A/B 이름을 정합니다. 편집 대상을 고르고 이름표 문단·섹션·문서 전체 중 쟁점 범위를 선택하세요. 변경 사유와 함께 저장하면 대안 파일만 갱신됩니다.
+
+**기획 비교**에서 기준안과 각 대안을 나란히 확인하고 선택한 안을 확정합니다. 기준안이 먼저 바뀌면 이전 기준·현재 기준·대안 원문을 모두 표시합니다. 목록이나 표 하나만 따로 선택하는 기능은 첫 버전에 포함하지 않습니다.
