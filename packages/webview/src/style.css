@@ -82,3 +82,38 @@ h2 { font-size: 13px; margin: 0 0 6px; }
 .draft-row .grid-cell { padding: 4px; }
 .draft-row input { width: 100%; min-width: 0; height: 32px; color: inherit; background: var(--surface); border: 1px solid var(--accent); padding: 4px; }
 .row-menu { display: flex; flex-direction: column; gap: 4px; }
+
+/* Shared surfaces follow the active VS Code theme, including custom themes. */
+:root {
+  --canvas: var(--vscode-editor-background, #fff);
+  --input-surface: var(--vscode-input-background, #fff);
+  --input-ink: var(--vscode-input-foreground, #263247);
+  --secondary: var(--vscode-button-secondaryBackground, #edf0f4);
+  --secondary-ink: var(--vscode-button-secondaryForeground, #263247);
+  --secondary-hover: var(--vscode-button-secondaryHoverBackground, #e0e5ec);
+  --hover: var(--vscode-list-hoverBackground, #edf1f6);
+}
+@media (prefers-color-scheme: dark) {
+  :root { --canvas: var(--vscode-editor-background, #171b22); --input-surface: var(--vscode-input-background, #242b36); --input-ink: var(--vscode-input-foreground, #e5e9f0); --secondary: var(--vscode-button-secondaryBackground, #303743); --secondary-ink: var(--vscode-button-secondaryForeground, #dbe1ee); --secondary-hover: var(--vscode-button-secondaryHoverBackground, #414959); --hover: var(--vscode-list-hoverBackground, #272e38); }
+}
+.app { padding: 16px 20px 12px; gap: 10px; }
+.toolbar { min-height: 32px; flex-wrap: wrap; }
+.toolbar h1 { font-size: 20px; letter-spacing: -.02em; }
+.toolbar > div { gap: 10px; }
+.toolbar-actions button, .view-tools button, .find-bar button,
+.plans-toolbar button, .plans-actions button {
+  background: var(--secondary); color: var(--secondary-ink); border-color: var(--line);
+}
+.toolbar-actions button:hover, .view-tools button:hover, .find-bar button:hover,
+.plans-toolbar button:hover, .plans-actions button:hover { background: var(--secondary-hover); }
+.view-tools { padding: 8px 0; border-bottom: 1px solid var(--line); gap: 12px; }
+.view-tools input, .view-tools select, .find-bar input { border-radius: 4px; padding: 5px 6px; background: var(--input-surface); color: var(--input-ink); }
+.grid-scroll { border-radius: 5px; background: var(--canvas); }
+.grid-header { box-shadow: 0 1px 0 var(--line); }
+.grid-header strong { font-weight: 600; }
+.grid-header span { margin-top: 2px; }
+.grid-row:hover .grid-cell:not(.selected):not(.invalid) { background: var(--hover); }
+.grid-cell.key-cell { box-shadow: 1px 0 0 var(--line); }
+.diagnostics { padding: 10px 0 0; }
+.diagnostics h2 { margin-bottom: 6px; }
+.baseline-banner { padding: 8px 10px; border-left-width: 2px; border-radius: 3px; font-size: 12px; }

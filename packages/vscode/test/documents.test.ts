@@ -120,7 +120,7 @@ suite('vibe-spec documents in native VS Code', function () {
     const invalid = entries.find(item => label(item) === '확인 필요')!;
     assert.equal(valid.contextValue, 'vibe-document');
     assert.equal(valid.description, '오류 0개');
-    assert.equal(invalid.iconPath instanceof vscode.ThemeIcon && invalid.iconPath.id, 'markdown');
+    assert.equal(invalid.iconPath instanceof vscode.ThemeIcon && invalid.iconPath.id, 'file-text');
     assert.notEqual(invalid.description, '오류 0개');
     assert.equal(valid.command?.command, 'vibe.openDocument');
     assert.deepEqual(valid.command?.arguments, ['경제 # %']);

@@ -359,6 +359,34 @@ suite('vibe-spec extension in VS Code', function () {
       'The recreated plans directory did not watch new nested variants.');
   });
 
+  test('sidebar selection replaces the plan in the same panel and clearing selection sends an empty state', async () => {
+    let project = api.getProject()!;
+    for (const name of ['first', 'second']) project = (await createPlan(projectRoot, project.revision, name,
+      { title: name + ' comparison', status: 'review' })).project;
+    await api.refresh();
+    const items = await treeItems(api.plans);
+    assert.ok(items.every(item => (item.iconPath as vscode.ThemeIcon).id === 'git-compare'));
+    const open = (item: vscode.TreeItem) => vscode.commands.executeCommand<vscode.WebviewPanel>(item.command!.command, ...item.command!.arguments!);
+    const panel = await open(items.find(item => label(item) === 'first comparison')!);
+    const received: { type: string; replace?: boolean; view?: { plan: { name: string } } }[] = [];
+    const subscription = panel.webview.onDidReceiveMessage(message => {
+      if (message.type === 'selectedPlanObservation') received.push(message.state);
+    });
+    try {
+      panel.webview.html = `<!doctype html><script>
+        const host = acquireVsCodeApi();
+        addEventListener('message', event => host.postMessage({ type: 'selectedPlanObservation', state: event.data }));
+        host.postMessage({ type: 'ready' });
+      </script>`;
+      await eventually(() => received.some(state => state.view?.plan.name === 'first' && state.replace), 'Initial selected plan missing.');
+      assert.equal(await open(items.find(item => label(item) === 'second comparison')!), panel);
+      await eventually(() => received.some(state => state.view?.plan.name === 'second' && state.replace), 'Second sidebar selection did not replace the center.');
+      const count = received.length;
+      assert.equal(await vscode.commands.executeCommand('vibe.openPlan'), panel);
+      await eventually(() => received.slice(count).some(state => state.type === 'plansState' && state.replace && !state.view), 'No-selection state missing.');
+    } finally { subscription.dispose(); panel.dispose(); }
+  });
+
   test('baseline-change warnings use warning icons and do not add table validation errors', async () => {
     let project = (await createPlan(projectRoot, api.getProject()!.revision, 'review', { title: '검토', status: 'review' })).project;
     project = (await writeVariant(projectRoot, project.revision, 'review', 'A', { set: { 'offers/bundle/price': '150' } })).project;

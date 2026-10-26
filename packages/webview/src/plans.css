@@ -1,25 +1,37 @@
-.plans-app { padding: 18px; max-width: 1400px; margin: auto; }
-.plans-toolbar, .plans-actions, .plans-list { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
-.plans-toolbar { justify-content: space-between; margin-bottom: 18px; }
-.plans-list { margin-bottom: 18px; }
-.plans-list button[aria-current] { outline: 2px solid var(--accent); outline-offset: 2px; }
-.plans-info, .plans-patches { border: 1px solid var(--line); padding: 14px; margin: 14px 0; }
-.plans-info h2 { font-size: 18px; }
+.plans-app { padding: 24px; max-width: 1400px; margin: auto; line-height: 1.5; }
+.plans-toolbar, .plans-actions, .plans-heading { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.plans-toolbar { justify-content: space-between; padding-bottom: 16px; border-bottom: 1px solid var(--line); margin-bottom: 16px; }
+.plans-heading { min-width: 0; }
+.plans-heading h1 { font-size: 22px; overflow-wrap: anywhere; }
+.plan-status { color: var(--vscode-badge-foreground, var(--secondary-ink)); background: var(--vscode-badge-background, var(--secondary)); border: 1px solid var(--line); border-radius: 12px; padding: 2px 9px; font-size: 12px; white-space: nowrap; }
+.plans-info { margin: 0 0 20px; }
+.plans-info p { margin: 8px 0; }
+.plans-location { color: var(--muted); font-size: 12px; }
+.plans-actions { margin-top: 12px; }
+.plans-patches { border: 1px solid var(--line); border-radius: 5px; padding: 16px; margin: 20px 0; }
+.plans-patches h2, .plans-diagnostics h2 { font-size: 15px; margin-bottom: 12px; }
 .plans-banner, .baseline-banner { background: var(--surface); border-left: 4px solid var(--accent); padding: 10px; }
 .baseline-banner { margin: 0; flex-shrink: 0; }
-.plans-scroll { overflow: auto; }
+.plans-scroll { overflow: auto; border: 1px solid var(--line); border-radius: 5px; }
 .plans-app table { border-collapse: collapse; width: 100%; }
-.plans-app th, .plans-app td { border: 1px solid var(--line); padding: 10px; text-align: left; vertical-align: top; white-space: pre-wrap; min-width: 130px; overflow-wrap: anywhere; }
-.plans-app th { background: var(--surface); }
-.plans-app .plans-touched { background: var(--vscode-diffEditor-insertedTextBackground, #d9efdf); box-shadow: inset 3px 0 var(--accent); }
-.plans-error, .plans-warning { padding: 12px; border: 1px solid; margin: 12px 0; overflow-wrap: anywhere; }
+.plans-app th, .plans-app td { border: 1px solid var(--line); padding: 12px; text-align: left; vertical-align: top; white-space: pre-wrap; min-width: 130px; overflow-wrap: anywhere; }
+.plans-app thead th { font-weight: 600; background: var(--surface); }
+.plans-app tbody th { background: var(--surface); font-weight: 400; font-size: 12px; }
+.plans-app .plans-touched { background: var(--vscode-diffEditor-insertedTextBackground, color-mix(in srgb, var(--accent) 12%, transparent)); box-shadow: inset 2px 0 var(--accent); }
+.plans-error, .plans-warning { padding: 12px; border: 1px solid; border-radius: 4px; margin: 12px 0; overflow-wrap: anywhere; }
 .plans-error { border-color: var(--vscode-inputValidation-errorBorder, #bd3030); }
 .plans-warning { border-color: var(--vscode-inputValidation-warningBorder, #a16b00); }
 .plans-diagnostics dl { display: grid; grid-template-columns: 90px 1fr; gap: 6px; }
 .plans-diagnostics dd { margin: 0; white-space: pre-wrap; }
-.plans-app pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+.plans-app pre { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; font-family: var(--vscode-editor-font-family, monospace); }
 .plans-app summary { cursor: pointer; overflow-wrap: anywhere; }
-.plans-patches article + article { margin-top: 14px; }
-.plans-patches button { margin-top: 10px; }
-.plans-confirm { position: fixed; z-index: 30; inset: 20% auto auto 50%; transform: translateX(-50%); width: min(580px, 90vw); background: var(--vscode-editor-background, white); border: 2px solid var(--accent); padding: 22px; box-shadow: 0 8px 35px #0006; }
+.plans-patches article { display: flex; flex-wrap: wrap; align-items: start; gap: 12px; }
+.plans-patches article + article { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); }
+.plans-patches details { flex: 1; min-width: 200px; }
+.plans-patches pre { margin-top: 12px; }
+.plans-confirm { position: fixed; z-index: 30; inset: 20% auto auto 50%; transform: translateX(-50%); width: min(580px, 90vw); background: var(--canvas); border: 2px solid var(--accent); border-radius: 6px; padding: 22px; box-shadow: 0 8px 35px #0006; }
 .plans-confirm button { margin: 6px 8px 0 0; }
+.plans-empty { margin: 64px auto; max-width: 480px; text-align: center; }
+.plans-empty h2 { font-size: 18px; }
+.plans-empty p { color: var(--muted); }
+@media (max-width: 700px) { .plans-app { padding: 16px; } }

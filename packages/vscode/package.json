@@ -5,7 +5,7 @@
   "homepage": "https://github.com/COLLABO-GAMES-DEV/vibe-spec-vscode-extension#readme",
   "displayName": "vibe-spec — 게임 기획",
   "description": "Git 파일을 원본으로 사용하는 게임 기획 테이블·문서 편집기",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "publisher": "ijun17",
   "license": "UNLICENSED",
   "private": true,

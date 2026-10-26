@@ -123,7 +123,7 @@ suite('vibe-spec unified planning tree in native VS Code', function () {
     assert.deepEqual(children().filter(item => item.kind === 'folder').map(label).sort(), ['경제', '빈 폴더'].sort());
     const entries = children(folder('경제/상점'));
     assert.deepEqual(entries.map(label).sort(), ['offers', '안내', '오류 문서'].sort());
-    for (const [name, icon, command] of [['offers', 'table', 'vibe.openTable'], ['안내', 'markdown', 'vibe.openDocument']]) {
+    for (const [name, icon, command] of [['offers', 'table', 'vibe.openTable'], ['안내', 'file-text', 'vibe.openDocument']]) {
       const item = entries.find(item => label(item) === name)!;
       assert.equal((item.iconPath as vscode.ThemeIcon).id, icon);
       assert.equal(item.command?.command, command);

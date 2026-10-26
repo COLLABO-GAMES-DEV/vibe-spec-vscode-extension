@@ -118,7 +118,7 @@ export class PlanningTree implements vscode.TreeDataProvider<PlanningItem>, vsco
       const item = new PlanningItem(kind, folder, project.root, entry.name, entry.name);
       item.id = JSON.stringify([project.root, kind, entry.file]); item.contextValue = 'vibe-' + kind;
       item.description = counts(diagnosticFiles(entry)); item.tooltip = entry.file;
-      item.iconPath = new vscode.ThemeIcon(kind === 'table' ? 'table' : 'markdown');
+      item.iconPath = new vscode.ThemeIcon(kind === 'table' ? 'table' : 'file-text');
       item.command = { command: kind === 'table' ? 'vibe.openTable' : 'vibe.openDocument', title: '열기', arguments: [entry.name] };
       return item;
     }).sort((a, b) => compareResourceNames(String(a.label), String(b.label)));

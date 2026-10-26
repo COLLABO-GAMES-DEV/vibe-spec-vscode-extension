@@ -49,3 +49,52 @@
 .document-target strong { display: block; font-size: 1.1rem; margin-bottom: 8px; }
 .document-scope-option { display: block; margin: 4px 0; }
 .document-inherited { opacity: .65; background: var(--vscode-editor-inactiveSelectionBackground, #7772); }
+
+.documents-content { max-width: 1000px; padding-top: 20px; }
+.document-header { padding-bottom: 10px; border-bottom: 1px solid var(--line); margin-bottom: 12px; }
+.document-header h1 { font-size: 26px; letter-spacing: -.02em; }
+.document-target { border: 1px solid var(--line); border-radius: 5px; padding: 10px 12px; margin-bottom: 20px; background: var(--surface); font-size: 12px; }
+.document-target > strong { display: inline-block; margin: 0 18px 6px 0; font-size: 13px; }
+.document-target > label { display: inline-flex; gap: 8px; align-items: center; }
+.document-target select { max-width: 100%; color: var(--input-ink); background: var(--input-surface); border: 1px solid var(--line); border-radius: 4px; padding: 4px 6px; }
+.document-target details { margin-top: 6px; }
+.document-target summary { color: var(--muted); cursor: pointer; }
+.document-target form { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 10px; align-items: center; }
+.document-rich .bn-container { color: var(--vscode-editor-foreground, inherit); }
+.document-rich .bn-editor { background: var(--canvas); font-size: 15px; padding-bottom: 40px; }
+.document-rich .bn-block-content { line-height: 1.6; }
+.document-rich .bn-block-content[data-content-type="heading"] { margin-top: 14px; }
+.document-rich h1 { font-size: 30px; line-height: 1.25; letter-spacing: -.025em; }
+.document-rich h2 { font-size: 23px; line-height: 1.35; letter-spacing: -.015em; }
+.document-rich h3 { font-size: 18px; line-height: 1.4; }
+.document-rich :is(td, th) { border-color: var(--line); }
+.document-rich th { background: var(--surface); }
+.document-rich blockquote { color: var(--muted); border-color: var(--line); }
+.document-rich a { color: var(--vscode-textLink-foreground, var(--accent)); }
+.documents-app input:not([type="checkbox"]), .documents-app textarea { background: var(--input-surface); color: var(--input-ink); }
+.document-menu-items { background: var(--canvas); }
+.document-references { display: flex; flex-wrap: wrap; gap: 8px; border-top: 1px solid var(--line); padding-top: 12px; }
+.document-link { font-size: 12px; border-radius: 4px; }
+.document-link:hover { background: var(--hover); }
+.document-diagnostics, .document-usages { border-top: 1px solid var(--line); padding-top: 16px; }
+/* BlockNote also creates portal menus outside the document wrapper. */
+body .bn-root, body .bn-root[data-color-scheme] {
+  --bn-colors-editor-text: var(--vscode-editor-foreground, var(--input-ink));
+  --bn-colors-editor-background: var(--canvas);
+  --bn-colors-menu-text: var(--vscode-menu-foreground, var(--input-ink));
+  --bn-colors-menu-background: var(--vscode-menu-background, var(--surface));
+  --bn-colors-tooltip-text: var(--vscode-editorHoverWidget-foreground, var(--input-ink));
+  --bn-colors-tooltip-background: var(--vscode-editorHoverWidget-background, var(--surface));
+  --bn-colors-hovered-text: var(--vscode-list-hoverForeground, var(--input-ink));
+  --bn-colors-hovered-background: var(--hover);
+  --bn-colors-selected-text: var(--vscode-list-activeSelectionForeground, var(--input-ink));
+  --bn-colors-selected-background: var(--vscode-list-activeSelectionBackground, var(--secondary));
+  --bn-colors-disabled-text: var(--vscode-disabledForeground, var(--muted));
+  --bn-colors-disabled-background: var(--surface);
+  --bn-colors-border: var(--line);
+  --bn-colors-side-menu: var(--muted);
+  --bn-colors-shadow: var(--vscode-widget-shadow, #0003);
+}
+.document-rich .bn-editor table :is(td, th) { border-color: var(--line); }
+.document-error { background: var(--vscode-inputValidation-errorBackground, color-mix(in srgb, #c43232 12%, var(--canvas))); }
+.document-warning { background: var(--vscode-inputValidation-warningBackground, color-mix(in srgb, #a16b00 12%, var(--canvas))); }

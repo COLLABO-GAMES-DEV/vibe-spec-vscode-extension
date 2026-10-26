@@ -26,7 +26,7 @@ test.beforeEach(async ({ request }) => {
 
 test('compares core baseline/A/B values, marks only touched alternatives, and identifies baseline editing', async ({ page }) => {
   await open(page);
-  await expect(page.getByRole('navigation', { name: '기획 목록' })).toContainText('기획중');
+  await expect(page.locator('.plan-status')).toContainText('기획중');
   const price = row(page, 'offers/bundle/price');
   await expect(price.getByRole('cell')).toHaveText(['+001.2300E+0002', '150.000', '+001.2300E+0002']);
   await expect(price.getByRole('cell').nth(1)).toHaveAttribute('data-touched', 'true');
@@ -41,10 +41,10 @@ test('compares core baseline/A/B values, marks only touched alternatives, and id
 test('human status changes persist through core and can return from review to draft', async ({ page, request }) => {
   await open(page);
   await page.getByRole('button', { name: '컨펌 전으로 변경' }).click();
-  await expect(page.getByRole('navigation', { name: '기획 목록' })).toContainText('컨펌 전');
+  await expect(page.locator('.plan-status')).toContainText('컨펌 전');
   expect((await inspect(request)).plan.status).toBe('review');
   await page.getByRole('button', { name: '기획중으로 변경' }).click();
-  await expect(page.getByRole('navigation', { name: '기획 목록' })).toContainText('기획중');
+  await expect(page.locator('.plan-status')).toContainText('기획중');
   expect((await inspect(request)).plan.status).toBe('draft');
 });
 
@@ -116,3 +116,31 @@ for (const operation of ['planStatus', 'planApprove'] as const) {
     await expect(page.getByRole('alert').filter({ hasText: 'STALE_REVISION' })).toHaveCount(0);
   });
 }
+
+test('only the sidebar-selected plan occupies the center, even with dozens of plans; an unselected panel explains where to start', async ({ page, request }) => {
+  const view = await inspect(request);
+  const plans = Array.from({ length: 45 }, (_, index) => ({ name: `review-${index}`, title: `합성 검토 ${index}`, status: 'review', variants: ['A', 'B'] }));
+  const empty = { type: 'plansState', revision: view.revision, plans, replace: true };
+  // The real VS Code bridge receives a replace state when a sidebar command opens a plan.
+  await page.addInitScript(state => {
+    Object.assign(window, { acquireVsCodeApi: () => ({ postMessage: (message: { type: string }) => {
+      if (message.type === 'ready') window.postMessage(state, '*');
+    } }) });
+  }, empty);
+  await page.goto('/?mode=plans');
+  await expect(page.getByLabel('기획 선택 안내')).toBeVisible();
+  await expect(page.getByRole('navigation', { name: '기획 목록' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /합성 검토/ })).toHaveCount(0);
+  await page.evaluate(state => window.postMessage(state, '*'), { ...empty, selected: view.plan.name, view });
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(view.plan.title);
+  await expect(page.getByLabel('기획 선택 안내')).toHaveCount(0);
+  expect((await page.getByRole('table').boundingBox())!.y).toBeLessThan(450);
+  const next = { ...view, plan: { ...view.plan, name: 'second', title: '두 번째 합성 검토', status: 'review' as const } };
+  await page.evaluate(state => window.postMessage(state, '*'), { ...empty, selected: 'second', view: next });
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('두 번째 합성 검토');
+  await expect(page.locator('.plan-status')).toHaveText('컨펌 전');
+  await expect(page.getByRole('heading', { name: view.plan.title, exact: true })).toHaveCount(0);
+  await page.evaluate(state => window.postMessage(state, '*'), { ...empty, plans: [] });
+  await expect(page.getByLabel('기획 선택 안내')).toContainText('아직 기획이 없습니다');
+  await expect(page.getByRole('table')).toHaveCount(0);
+});

@@ -51,24 +51,20 @@ export function PlansApp({ host }: { host: PlansHost }) {
     host.send(message);
   }
   return <main className="plans-app">
-    <header className="plans-toolbar"><h1>기획 비교</h1>
+    <header className="plans-toolbar"><div className="plans-heading"><h1>{view?.plan.title ?? '기획 비교'}</h1>
+      {view && <span className="plan-status">{planStatusLabels[view.plan.status]}</span>}</div>
       <button disabled={busy} onClick={() => send({ type: 'planReload' })}>현재 파일 다시 읽기</button>
     </header>
     {screen.error && <p role="alert" className="plans-error">{screen.error}</p>}
     {state?.notice && <p role="status">{state.notice}</p>}
     {!state && <p role="status">기획을 불러오는 중입니다.</p>}
-    {state && <nav aria-label="기획 목록" className="plans-list">
-      {state.plans.map(plan => <button key={plan.name} disabled={busy}
-        aria-current={view?.plan.name === plan.name ? 'page' : undefined}
-        onClick={() => send({ type: 'planOpen', name: plan.name })}>
-        {plan.title} · {planStatusLabels[plan.status]}{plan.selected ? ' · ' + plan.selected + '안 선택' : ''}
-      </button>)}
-      {!state.plans.length && <p>아직 기획이 없습니다.</p>}
-    </nav>}
+    {state && !view && <section className="plans-empty" aria-label="기획 선택 안내">
+      <h2>비교할 기획을 선택해 주세요.</h2>
+      <p>{state.plans.length ? '왼쪽 사이드바의 기획 비교 목록에서 하나를 선택하면 기준안과 대안을 나란히 볼 수 있습니다.' : '아직 기획이 없습니다. 기획을 만든 뒤 사이드바에서 선택해 주세요.'}</p>
+    </section>}
     {view && <>
       <section aria-label="기획 정보" className="plans-info">
-        <h2>{view.plan.title}</h2>
-        <p><strong>{planStatusLabels[view.plan.status]}</strong> · <code>plans/{view.plan.name}/</code></p>
+        <p className="plans-location"><code>plans/{view.plan.name}/</code></p>
         {view.plan.question && <p>{view.plan.question}</p>}
         {view.plan.sources?.length ? <details><summary>출처</summary><pre>{JSON.stringify(view.plan.sources, null, 2)}</pre></details> : null}
         {archived && <p className="plans-banner">확정 · {state?.view?.plan.selected ?? view.plan.selected}안 선택 · 변경분 보관됨. 다시 확정하거나 상태를 바꿀 수 없습니다.</p>}

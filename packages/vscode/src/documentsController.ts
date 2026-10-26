@@ -89,7 +89,7 @@ export class DocumentsController implements vscode.TreeDataProvider<vscode.TreeI
         item.contextValue = 'vibe-document';
         item.description = `오류 ${document.errors}개` + (document.warnings ? ` · 경고 ${document.warnings}개` : '');
         item.tooltip = resourceFile(project, 'document', document.name);
-        item.iconPath = new vscode.ThemeIcon(document.errors ? 'error' : document.warnings ? 'warning' : 'markdown');
+        item.iconPath = new vscode.ThemeIcon(document.errors ? 'error' : document.warnings ? 'warning' : 'file-text');
         item.command = { command: 'vibe.openDocument', title: '문서 열기', arguments: [document.name] };
         return item;
       });

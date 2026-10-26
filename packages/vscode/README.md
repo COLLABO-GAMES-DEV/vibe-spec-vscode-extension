@@ -6,7 +6,7 @@
 
 게임 기획 테이블과 문서를 VS Code에서 편집하고 Git으로 함께 관리합니다. YAML 테이블과 Markdown 문서를 원본으로 사용하며, 화면과 CLI에서 같은 데이터와 검증 규칙으로 작업합니다.
 
-확장 ID: `ijun17.vibe-spec` · 버전: **0.9.0**
+확장 ID: `ijun17.vibe-spec` · 버전: **0.9.1**
 
 <!-- Screenshot placeholder: a table with fictional sample data, the table sidebar, and a validation error. -->
 
@@ -14,7 +14,7 @@
 
 표 화면을 사용하려면 **VS Code 1.140 이상**과 **시스템 Git**이 필요합니다. CLI나 Codex로 작업할 때는 **Node.js 24 이상**도 설치하세요.
 
-1. VS Code 확장에서 `ijun17.vibe-spec`을 찾아 설치합니다. VSIX 파일이 있다면 확장 화면의 `…` → **Install from VSIX…**에서 `vibe-spec-0.9.0.vsix`를 선택합니다.
+1. VS Code 확장에서 `ijun17.vibe-spec`을 찾아 설치합니다. VSIX 파일이 있다면 확장 화면의 `…` → **Install from VSIX…**에서 `vibe-spec-0.9.1.vsix`를 선택합니다.
 2. 로컬 프로젝트 폴더를 열고 왼쪽 **vibe-spec** 아이콘을 누릅니다.
 3. 기존 데이터가 있으면 **기획 폴더 선택**, 처음 시작하면 빈 폴더에서 **새 기획 폴더 초기화**를 선택합니다.
 4. **새 테이블**로 이름과 Key 열을 정하거나 **불러오기**로 CSV·TSV·XLSX를 가져옵니다. 사이드바에서 테이블을 눌러 편집합니다.

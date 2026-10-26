@@ -10,7 +10,7 @@
     "url": "https://github.com/COLLABO-GAMES-DEV/vibe-spec-vscode-extension/issues"
   },
   "homepage": "https://github.com/COLLABO-GAMES-DEV/vibe-spec-vscode-extension#readme",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "private": true,
   "type": "module",
   "scripts": {
