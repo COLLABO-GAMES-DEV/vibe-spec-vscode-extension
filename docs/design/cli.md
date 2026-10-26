@@ -146,3 +146,5 @@ vibe rename column "shop-products/*/price_currency" --target base --to currency 
 ## 문서 대안 대상
 
 [문서 대안](document-variants.md)은 `plan variant`의 `documents` 경로→Markdown 입력으로 범위를 선언한다. `document read <name> --target <plan>/<variant>`로 core가 합친 문서를 읽고, 그 블록 순번·revision으로 `document edit <name> --target <plan>/<variant> --input <operations.json> --expect-revision <revision> --dry-run`을 실행한다. 범위 밖 편집은 거절한다. 과거 기준값은 core가 기록한다. 확정은 기존 `plan approve`만 사용한다.
+
+이름 안에 `/`가 있으면 [확장 주소](format.md#확장-주소)를 쓴다. `vibe read "./items/30~110" --json`은 원문 Key `30/10`을 읽는다. apply JSON의 `key`·ref 값·rename의 `--to`는 원문이며 주소만 이스케이프한다. `folder list`·`document read`가 반환한 주소를 그대로 사용한다.
