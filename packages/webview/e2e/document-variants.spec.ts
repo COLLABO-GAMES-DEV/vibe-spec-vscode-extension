@@ -61,3 +61,22 @@ test('creates an alternative from the document and prevents edits outside select
   await outside.click(); await page.keyboard.type('forbidden');
   await expect(page.getByRole('alert')).toContainText('상속'); await expect(outside).toHaveText('그대로');
 });
+test('different nested scopes in A and B compare each composed result rather than the baseline fallback', async ({ page }) => {
+  await page.goto('/?mode=documents&document=' + encodeURIComponent(name));
+  await page.getByLabel('문서 편집 대상 선택').selectOption('document-review/A');
+  const section = page.getByRole('checkbox', { name: name + '/Intro (섹션)', exact: true });
+  await section.click(); await expect(section).toBeChecked();
+  await rich(page).locator('.bn-inline-content').filter({ hasText: /^선택 내용$/ }).fill('A 섹션 변경');
+  await save(page);
+  await page.getByLabel('문서 편집 대상 선택').selectOption('document-review/B');
+  const paragraph = page.getByRole('checkbox', { name: name + '/Intro/note (이름표 문단)', exact: true });
+  await paragraph.click(); await expect(paragraph).toBeChecked();
+  await rich(page).locator('.bn-inline-content').filter({ hasText: /^원문$/ }).fill('B 문단 변경');
+  await save(page);
+  await page.goto('/?mode=plans&plan=document-review');
+  const row = page.getByRole('rowheader', { name: name + '/Intro', exact: true }).locator('..');
+  await expect(row.getByRole('cell').nth(1)).toContainText('A 섹션 변경');
+  await expect(row.getByRole('cell').nth(2)).toContainText('B 문단 변경');
+  await expect(row.getByRole('cell').nth(2)).toContainText('선택 내용');
+  await expect(row.getByRole('cell').nth(2)).toHaveAttribute('data-touched', 'true');
+});

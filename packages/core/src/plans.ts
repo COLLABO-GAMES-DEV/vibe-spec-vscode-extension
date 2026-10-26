@@ -333,11 +333,20 @@ export function getPlan(project: Project, name: string): PlanView {
     return { path, baseline: current, alternatives };
   });
   const documentPaths = new Set(Object.values(variants).flatMap(input => Object.keys(input.documents ?? {})));
+  const composedVariants = new Map<string, Project>();
+  if (documentPaths.size && plan.status !== 'approved') for (const [name, input] of Object.entries(variants)) {
+    try { composedVariants.set(name, composed(project, input, variantPath(plan.name, name))); } catch { /* Composition errors are already reported above. */ }
+  }
   const documentComparison = sorted(documentPaths).map(path => {
     let current: PlanValue = absent();
     try { current = { present: true, value: documentScope(project, path).markdown }; } catch { /* Missing scope is a composition error above. */ }
     return { path, kind: 'document' as const, baseline: current, alternatives: Object.fromEntries(Object.entries(variants).map(([name, input]) =>
-      [name, Object.hasOwn(input.documents ?? {}, path) ? { present: true, value: input.documents![path] } : current])) };
+      {
+        if (plan.status === 'approved') return [name, Object.hasOwn(input.documents ?? {}, path) ? { present: true, value: input.documents![path] } : current];
+        const alternative = composedVariants.get(name);
+        try { return [name, alternative ? { present: true, value: documentScope(alternative, path).markdown } : absent()]; }
+        catch { return [name, absent()]; }
+      })) };
   });
   return { revision: project.revision, plan, variants, comparison: [...comparison, ...documentComparison], diagnostics };
 }

@@ -12,7 +12,7 @@ function cellText(cell: PlanValue): string { return cell.present ? valueText(cel
 // come from core's comparison, including values inherited from the baseline.
 function touched(variant: Variant | undefined, path: string): boolean {
   if (!variant) return false;
-  return Object.hasOwn(variant.documents ?? {}, path) || Object.hasOwn(variant.set ?? {}, path)
+  return Object.keys(variant.documents ?? {}).some(scope => scope === path || scope.startsWith(path + '/') || path.startsWith(scope + '/')) || Object.hasOwn(variant.set ?? {}, path)
     || Object.keys(variant.add ?? {}).some(row => path === row || path.startsWith(row + '/'))
     || (variant.remove ?? []).some(row => path === row || path.startsWith(row + '/'));
 }

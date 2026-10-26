@@ -93,3 +93,11 @@ it('captures new selected scopes while keeping every other snapshot byte and acc
   expect(changed.source).toContain('- first\n- second'); expect(changed.source).toContain('> note');
   expect(changed.source.slice(changed.source.indexOf('# 바깥'))).toBe(source.slice(source.indexOf('# 바깥')));
 });
+it('compares composed scope values when alternatives choose different nested scopes', async () => {
+  let p = await fixture(); const section = 'rules/前 😀', paragraph = section + '/note';
+  p = (await writeVariant(p.root, p.revision, 'review', 'A', { documents: { [section]: documentScope(p, section).markdown.replace('내용', 'section A') } })).project;
+  p = (await writeVariant(p.root, p.revision, 'review', 'B', { documents: { [paragraph]: 'paragraph B' } })).project;
+  const rows = getPlan(p, 'review').comparison;
+  expect(rows.find(row => row.path === section)?.alternatives.B?.value).toBe(documentScope(readVariant(p, 'review', 'B'), section).markdown);
+  expect(rows.find(row => row.path === paragraph)?.alternatives.A?.value).toBe(documentScope(readVariant(p, 'review', 'A'), paragraph).markdown);
+});
