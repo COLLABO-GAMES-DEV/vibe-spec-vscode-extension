@@ -1,3 +1,4 @@
+import { pathParts, pathFromParts, canonicalPath } from './paths.js';
 import { resourceEntries, resourceEntry, resourceFile, resourcePath } from './resources.js';
 import { renameDocument } from './documents.js';
 import { renameDocumentLinks } from './document-references.js';
@@ -33,8 +34,8 @@ function context(project: Project, name: string) {
   return found;
 }
 function keyName(value: unknown): asserts value is string {
-  if (typeof value !== 'string' || !validName(value) || value === '*') {
-    throw new VibeError('INVALID_KEY', 'Key must be a nonempty string without / or reserved *.');
+  if (typeof value !== 'string' || !value.length || value === '*') {
+    throw new VibeError('INVALID_KEY', 'Key must be a nonempty string without reserved *.');
   }
 }
 function rowIndex(project: Project, table: string, key: string): number {
@@ -142,7 +143,7 @@ export function prepareEdits(before: Project, operations: EditOperation[]): Map<
           const context = tableContexts(view).get(removed.table);
           if (!context?.table.rows.some(row => row[context.schema.primary_key] === removed.key)) continue;
           guard.push(...deletionDiagnostics(view, removed.table, removed.key).map(item => ({
-            ...item, target: removed.table + '/' + removed.key, message: plan + '/' + variant + ': ' + item.message,
+            ...item, target: pathFromParts([removed.table, removed.key]), message: plan + '/' + variant + ': ' + item.message,
           })));
         } catch (error) { if (!(error instanceof VibeError)) throw error; }
       }
@@ -174,12 +175,13 @@ function renamedResourcePath(project: Project, directory: 'tables' | 'schemas', 
 export async function renameResource(
   root: string, expectedRevision: string, kind: RenameKind, path: string, to: string, options: MutationOptions = {},
 ): Promise<WriteResult> {
+  path = canonicalPath(path);
   if (kind === 'document' || kind === 'heading' || kind === 'tag') return renameDocument(root, expectedRevision, kind, path, to, options);
   if (!['table', 'schema', 'key', 'column'].includes(kind) || typeof to !== 'string') throw new VibeError('INVALID_ARGUMENT', 'Invalid rename kind or new name.');
   if (kind === 'table' || kind === 'schema') {
     const error = resourceNameError(to);
     if (error) throw new VibeError('NAME_INVALID', error + ' 이름 제안: ' + suggestResourceName(to));
-  } else if (!validName(to)) throw new VibeError('INVALID_ARGUMENT', 'Invalid new name.');
+  } else if (kind === 'key' ? !to.length || to === '*' : !validName(to)) throw new VibeError('INVALID_ARGUMENT', 'Invalid new name.');
   let candidates: WriteResult['candidates'] = [];
   const result = await mutateProject(root, expectedRevision, async before => {
     if (kind === 'schema') {
@@ -200,7 +202,7 @@ export async function renameResource(
       changes.set(filePath, null);
       return changes;
     }
-    const [name, key, column, extra] = path.split('/');
+    const [name, key, column, extra] = pathParts(path);
     const target = context(before, name!);
     if (extra !== undefined || (kind === 'table' && key !== undefined) ||
         (kind === 'key' && (key === undefined || column !== undefined)) ||
@@ -216,14 +218,14 @@ export async function renameResource(
     if (kind === 'key') {
       keyName(to);
       if (to === key) return changes;
-      if (target.table.rows.some(row => row[target.schema.primary_key] === to) || hasPlanAddedRow(before, name + '/' + to)) {
+      if (target.table.rows.some(row => row[target.schema.primary_key] === to) || hasPlanAddedRow(before, pathFromParts([name!, to]))) {
         throw new VibeError('NAME_EXISTS', 'Key already exists in the baseline or an alternative: ' + to);
       }
       if (target.table.rows.some(row => row[target.schema.primary_key] === key)) {
         const index = rowIndex(before, name!, key!);
         const edited = scalar(target.file, ['rows', index, target.schema.primary_key], to);
         changes.set(edited.file, edited.source);
-      } else if (!hasPlanAddedRow(before, name + '/' + key)) throw new VibeError('PATH_NOT_FOUND', 'Unknown row: ' + path);
+      } else if (!hasPlanAddedRow(before, pathFromParts([name!, key!]))) throw new VibeError('PATH_NOT_FOUND', 'Unknown row: ' + path);
       for (const reference of declaredReferences(before)) {
         if (reference.target !== name) continue;
         for (const [i, row] of reference.table.rows.entries()) {

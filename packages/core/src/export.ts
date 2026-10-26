@@ -1,3 +1,4 @@
+import { folderStorage } from './folder-names.js';
 import { createHash, randomUUID } from 'node:crypto';
 import { lstat, mkdir, open, readFile, readdir, realpath, rm } from 'node:fs/promises';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
@@ -156,7 +157,7 @@ export async function exportMarkdown(project: Project, output?: string): Promise
     identities.add(resourceNameKey(name));
   }
   for (const { name, folder } of tables) {
-    wanted.set((folder ? folder + '/' : '') + name + '.md', markdown(project, name, marker, diagnostics.length));
+    wanted.set((folder ? folderStorage(project, folder) + '/' : '') + name + '.md', markdown(project, name, marker, diagnostics.length));
   }
   const ignore = join(directory, '.gitignore');
   const ignoreSource = await existingFile(ignore); // Preserve an existing output ignore file byte-for-byte.

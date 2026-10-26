@@ -1,7 +1,8 @@
+import { pathParts, pathFromParts, appendPath, pathContains } from '@vibe-spec/core/paths';
 import * as vscode from 'vscode';
 import { posix } from 'node:path';
 import {
-  applyFolderEdit, compareResourceNames, folderError, listFolders, loadProject, resourceEntries, resourceFile,
+  applyFolderEdit, folderStorage, compareResourceNames, folderError, listFolders, loadProject, resourceEntries, resourceFile,
   validateProject, VibeError,
 } from '@vibe-spec/core';
 import type { FolderOperation, Project } from '@vibe-spec/core';
@@ -17,8 +18,9 @@ interface FolderInput {
   table?: string; key?: { code: string; label: string };
 }
 type Selection = PlanningItem | FolderInput;
-const parentFolder = (path: string) => posix.dirname(path) === '.' ? '' : posix.dirname(path);
-const childPath = (folder: string, name: string) => folder ? folder + '/' + name : name;
+const parentFolder = (path: string) => pathFromParts(pathParts(path).slice(0, -1));
+const folderLabel = (path: string) => pathParts(path).join(' › ');
+const childPath = (folder: string, name: string) => pathFromParts([...(folder ? pathParts(folder) : []), name]);
 
 export class PlanningTree implements vscode.TreeDataProvider<PlanningItem>, vscode.Disposable {
   private readonly changed = new vscode.EventEmitter<void>();
@@ -66,7 +68,7 @@ export class PlanningTree implements vscode.TreeDataProvider<PlanningItem>, vsco
       { label: '문서', command: 'vibe.newDocument', create: 'document' },
     ];
     const choice = input?.create === undefined ? await vscode.window.showQuickPick(choices, {
-      title: '새로 만들기: 폴더·표·문서', placeHolder: '만들 위치: ' + (folder || '최상위 (루트)'),
+      title: '새로 만들기: 폴더·표·문서', placeHolder: '만들 위치: ' + (folderLabel(folder) || '최상위 (루트)'),
     }) : choices.find(choice => choice.create === input.create);
     if (!choice) return;
     // Keep the destination captured before the picker, even if selection changes.
@@ -78,10 +80,12 @@ export class PlanningTree implements vscode.TreeDataProvider<PlanningItem>, vsco
     return folder ? this.folderItem(item.projectRoot, folder) : undefined;
   }
   private folderItem(root: string, folder: string) {
-    const item = new PlanningItem('folder', folder, root, posix.basename(folder));
+    const item = new PlanningItem('folder', folder, root, pathParts(folder).at(-1)!);
     item.id = JSON.stringify([root, 'folder', folder]);
     item.contextValue = 'vibe-folder'; item.iconPath = new vscode.ThemeIcon('folder');
-    item.tooltip = 'tables/' + folder + '/\ndocuments/' + folder + '/';
+    const project = this.getProject();
+    const storage = project?.root === root ? folderStorage(project, folder) : folder;
+    item.tooltip = 'tables/' + storage + '/\ndocuments/' + storage + '/';
     item.collapsibleState = this.context.workspaceState.get(this.stateKey(root, folder), false)
       ? vscode.TreeItemCollapsibleState.Expanded : vscode.TreeItemCollapsibleState.Collapsed;
     return item;
@@ -104,9 +108,9 @@ export class PlanningTree implements vscode.TreeDataProvider<PlanningItem>, vsco
         ? resourceFile(project, 'schema', data.schema) : undefined;
       return schema ? [entry.file, schema] : [entry.file];
     };
-    const folders = listFolders(project).sort(compareResourceNames).filter(path => parentFolder(path) === folder).map(path => {
+    const folders = listFolders(project).filter(path => parentFolder(path) === folder).map(path => {
       const item = this.folderItem(project.root, path);
-      item.description = counts(entries.filter(entry => entry.folder === path || entry.folder.startsWith(path + '/')).flatMap(diagnosticFiles));
+      item.description = counts(entries.filter(entry => pathContains(path, entry.folder)).flatMap(diagnosticFiles));
       return item;
     });
     const resources = entries.filter(entry => entry.folder === folder).map(entry => {
@@ -126,13 +130,13 @@ export class PlanningTree implements vscode.TreeDataProvider<PlanningItem>, vsco
     if (selection instanceof PlanningItem && selection.projectRoot !== current.root) throw new VibeError('PROJECT_CHANGED', '기획 폴더가 바뀌었습니다.');
     const project = await loadProject(current.root);
     const input = selection instanceof PlanningItem ? undefined : selection;
-    const folders = listFolders(project).sort(compareResourceNames);
+    const folders = listFolders(project);
     let operation: FolderOperation;
     if (op === 'folder-create') {
       let path = input?.path;
       if (path === undefined) {
         const parent = this.selectedFolder(selection);
-        const name = input?.name ?? await vscode.window.showInputBox({ prompt: '새 폴더 이름 · ' + (parent || '최상위'),
+        const name = input?.name ?? await vscode.window.showInputBox({ prompt: '새 폴더 이름 · ' + (folderLabel(parent) || '최상위'),
           validateInput: name => folderError(childPath(parent, name)) });
         if (name === undefined) return;
         path = childPath(parent, name);
@@ -147,15 +151,15 @@ export class PlanningTree implements vscode.TreeDataProvider<PlanningItem>, vsco
       operation = { op, kind, name, folder };
     } else {
       const path = selection instanceof PlanningItem ? selection.folder : input?.path
-        ?? await vscode.window.showQuickPick(folders, { placeHolder: '폴더 선택' });
+        ?? (await vscode.window.showQuickPick(folders.map(folder => ({ label: folderLabel(folder), folder })), { placeHolder: '폴더 선택' }))?.folder;
       if (!path) return;
       if (op === 'folder-rename') {
-        const name = input?.name ?? await vscode.window.showInputBox({ prompt: '새 폴더 이름', value: posix.basename(path),
+        const name = input?.name ?? await vscode.window.showInputBox({ prompt: '새 폴더 이름', value: pathParts(path).at(-1)!,
           validateInput: name => folderError(childPath(parentFolder(path), name)) });
         if (name === undefined) return;
         operation = { op, path, name };
       } else if (op === 'folder-move') {
-        const folder = input?.folder ?? await this.destination(folders.filter(folder => folder !== path && !folder.startsWith(path + '/')));
+        const folder = input?.folder ?? await this.destination(folders.filter(folder => folder !== path && !pathContains(path, folder)));
         if (folder === undefined) return;
         operation = { op, path, folder };
       } else operation = { op, path };
@@ -166,7 +170,7 @@ export class PlanningTree implements vscode.TreeDataProvider<PlanningItem>, vsco
       const target = operation.op === 'resource-move' || operation.op === 'folder-move' ? operation.folder || '최상위'
         : operation.op === 'folder-rename' ? childPath(parentFolder(operation.path), operation.name) : operation.path;
       const accepted = await vscode.window.showInformationMessage('폴더 작업을 적용할까요?', {
-        modal: true, detail: '대상: ' + target + '\n\n변경 파일:\n' + preview.changed.join('\n'),
+        modal: true, detail: '대상: ' + folderLabel(target) + '\n\n변경 파일:\n' + preview.changed.join('\n'),
       }, '적용');
       if (accepted !== '적용') return;
     }
@@ -175,7 +179,7 @@ export class PlanningTree implements vscode.TreeDataProvider<PlanningItem>, vsco
     await this.refresh(); return result;
   }
   private async destination(folders: string[]): Promise<string | undefined> {
-    const choice = await vscode.window.showQuickPick([{ label: '최상위', folder: '' }, ...folders.map(folder => ({ label: folder, folder }))],
+    const choice = await vscode.window.showQuickPick([{ label: '최상위', folder: '' }, ...folders.map(folder => ({ label: folderLabel(folder), folder }))],
       { placeHolder: '대상 폴더 선택' });
     return choice?.folder;
   }

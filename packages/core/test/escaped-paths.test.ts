@@ -1,0 +1,146 @@
+import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { afterEach, expect, it } from 'vitest';
+import { loadProject, readPath, formattedSources } from '../src/project.js';
+import { applyEdits, renameResource } from '../src/editing.js';
+import { pathParts, pathFromParts } from '../src/paths.js';
+import { validateProject } from '../src/validation.js';
+import { createPlan, writeVariant, readVariant, approvePlan, getPlan } from '../src/plans.js';
+import { whereUsed } from '../src/usage.js';
+import { createDocument, getDocumentView, saveDocumentSnapshots } from '../src/documents.js';
+import { documentScope } from '../src/document-variants.js';
+import { applyFolderEdit } from '../src/folders.js';
+import { folderStorage } from '../src/folder-names.js';
+import { listFolders, resourceEntries } from '../src/resources.js';
+const roots: string[] = [];
+async function fixture() {
+  const root = await mkdtemp(join(tmpdir(), 'vibe-paths-')); roots.push(root);
+  await cp(fileURLToPath(new URL('./fixtures/project/', import.meta.url)), root, { recursive: true });
+  return loadProject(root);
+}
+afterEach(async () => { await Promise.all(roots.splice(0).map(root => rm(root, { recursive: true, force: true }))); });
+it('keeps legacy tilde, percent and full-width names distinct from explicit escaped names', () => {
+  for (const name of ['30/10', '30~110', '30%2F10', '30／10', '~/~0/~1', '/']) {
+    const path = pathFromParts(['items', name]); expect(pathParts(path)).toEqual(['items', name]);
+  }
+  expect(pathFromParts(['items', '30/10'])).toBe('./items/30~110');
+  expect(pathParts('items/30~110')).toEqual(['items', '30~110']);
+  expect(pathParts('./items/30~01~110')).toEqual(['items', '30~1/10']);
+  expect(() => pathParts('./items/~2')).toThrow();
+});
+it('reads, renames, tracks and protects raw slash Keys across refs, Markdown and alternatives', async () => {
+  let p = await fixture();
+  p = (await renameResource(p.root, p.revision, 'key', 'items/currency_gold', 'coin/blue')).project;
+  p = (await applyEdits(p.root, p.revision, [{ op: 'create', table: 'items', row: { code: 'coin~1blue', name: 'literal', kind: 'currency', note: '' } }])).project;
+  p = (await createDocument(p.root, p.revision, 'guide', '[value](./items/coin~1blue/name)\n\n[literal](items/coin~1blue/name)\n\n[legacy](items%2Fcoin~1blue%2Fname)\n')).project;
+  expect(readPath(p, './items/coin~1blue/name')).toEqual({ value: '골드', present: true });
+  expect(readPath(p, 'items/coin~1blue/name')).toEqual({ value: 'literal', present: true });
+  expect(validateProject(p)).toEqual([]);
+  await expect(applyEdits(p.root, p.revision, [{ op: 'delete', table: 'items', key: 'coin/blue' }])).rejects.toMatchObject({ code: 'DELETE_RESTRICTED' });
+  p = (await createPlan(p.root, p.revision, 'review', { title: 'Synthetic', status: 'review' })).project;
+  p = (await writeVariant(p.root, p.revision, 'review', 'A', { set: { './items/coin~1blue/name': '대안' } })).project;
+  expect(readPath(readVariant(p, 'review', 'A'), './items/coin~1blue/name')).toEqual({ value: '대안', present: true });
+  const used = await whereUsed(p, './items/coin~1blue');
+  expect(used.references.map(u => u.file)).toEqual(expect.arrayContaining(['tables/offers.yaml', 'documents/guide.md', 'plans/review/A.yaml']));
+  p = (await renameResource(p.root, p.revision, 'key', './items/coin~1blue', 'coin/red~1')).project;
+  expect(getPlan(p, 'review').variants.A!.set).toHaveProperty('./items/coin~1red~01/name');
+  expect(p.sources.get('documents/guide.md')).toContain('(./items/coin~1red~01/name)');
+  expect(p.sources.get('documents/guide.md')).toContain('(items%2Fcoin~1blue%2Fname)');
+  expect(validateProject(p)).toEqual([]);
+});
+it('preserves slash headings/tags, scoped alternatives and every byte outside a confirmed scope', async () => {
+  let p = await fixture();
+  const source = '\uFEFF# 공격 / 방어\r\n\r\n<!-- name: 기본/값~1 -->\r\n원문  \r\n\r\n# 바깥\r\n\r\n끝  ';
+  p = (await createDocument(p.root, p.revision, 'guide', source)).project;
+  const path = pathFromParts(['guide', '공격 / 방어', '기본/값~1']);
+  const view = getDocumentView(p, 'guide'); expect(view.diagnostics).toEqual([]);
+  expect((await saveDocumentSnapshots(p.root, p.revision, [{ name: 'guide', blocks: view.blocks.map(b => ({ original: b.index })) }])).changed).toEqual([]);
+  p = (await createPlan(p.root, p.revision, 'review', { title: 'Synthetic', status: 'review' })).project;
+  p = (await writeVariant(p.root, p.revision, 'review', 'A', { documents: { [path]: '대안  ' } })).project;
+  expect((await whereUsed(p, path)).references.some(u => u.file === 'plans/review/A.yaml')).toBe(true);
+  p = (await renameResource(p.root, p.revision, 'heading', pathFromParts(['guide', '공격 / 방어']), '새/제목~1')).project;
+  const next = pathFromParts(['guide', '새/제목~1', '기본/값~1']);
+  expect(documentScope(readVariant(p, 'review', 'A'), next).markdown).toBe('대안  ');
+  p = (await approvePlan(p.root, p.revision, 'review', 'A')).project;
+  expect(p.sources.get('documents/guide.md')).toBe(source.replace('공격 / 방어', '새\\/제목\\~1').replace('원문  ', '대안  '));
+  expect(validateProject(p)).toEqual([]);
+});
+it('keeps slash domain names distinct from literal escape spellings through creation, movement and rename', async () => {
+  let p = await fixture();
+  for (const path of ['공격~1방어', './공격~1방어', './공격~1방어/부속~1표']) p = (await applyFolderEdit(p.root, p.revision, { op: 'folder-create', path })).project;
+  expect(listFolders(p)).toEqual(expect.arrayContaining(['공격~1방어', './공격~1방어', './공격~1방어/부속~1표']));
+  const stored = folderStorage(p, './공격~1방어'); expect(stored).not.toBe('공격~1방어');
+  p = (await applyFolderEdit(p.root, p.revision, { op: 'resource-move', kind: 'table', name: 'items', folder: './공격~1방어/부속~1표' })).project;
+  expect(resourceEntries(p, 'table').find(e => e.name === 'items')?.folder).toBe('./공격~1방어/부속~1표');
+  p = (await applyFolderEdit(p.root, p.revision, { op: 'folder-rename', path: './공격~1방어', name: '새/폴더' })).project;
+  expect(listFolders(p)).toContain('./새~1폴더/부속~1표');
+  expect(resourceEntries(p, 'table').find(e => e.name === 'items')?.folder).toBe('./새~1폴더/부속~1표');
+  expect(validateProject(p)).toEqual([]);
+  const entry = resourceEntries(p, 'table').find(e => e.name === 'items')!;
+  expect(p.sources.get(entry.file)).toBe(await readFile(fileURLToPath(new URL('./fixtures/project/tables/items.yaml', import.meta.url)), 'utf8'));
+});
+it('renames added alternative Keys and columns, removes slash rows, and keeps undo addresses consistent', async () => {
+  const { ScreenHistory } = await import('../src/history.js');
+  const { resolveReference } = await import('../src/view.js');
+  let p = await fixture(); const history = new ScreenHistory();
+  const renamed = await renameResource(p.root, p.revision, 'key', 'items/currency_gold', 'coin/blue'); p = renamed.project;
+  history.recordRename(renamed, 'items', 'currency_gold', 'coin/blue');
+  expect(resolveReference(p, 'offers', 'bundle', 'currency').key).toBe('coin/blue');
+  p = (await history.undo(p.root, p.revision)).project;
+  expect(readPath(p, 'items/currency_gold')).toBeDefined();
+  p = (await history.redo(p.root, p.revision)).project;
+  expect(readPath(p, './items/coin~1blue')).toBeDefined();
+  p = (await createPlan(p.root, p.revision, 'review', { title: 'Synthetic', status: 'review' })).project;
+  p = (await writeVariant(p.root, p.revision, 'review', 'A', { add: { './items/new~1row': { name: 'new', kind: 'currency', note: '' } }, remove: ['items/consumable_potion'] })).project;
+  p = (await renameResource(p.root, p.revision, 'key', './items/new~1row', 'new/row~1')).project;
+  p = (await renameResource(p.root, p.revision, 'column', 'items/*/name', 'title')).project;
+  expect(readPath(readVariant(p, 'review', 'A'), './items/new~1row~01/title')).toMatchObject({ value: 'new' });
+  p = (await renameResource(p.root, p.revision, 'table', 'items', 'goods')).project;
+  expect(readPath(readVariant(p, 'review', 'A'), './goods/new~1row~01/title')).toMatchObject({ value: 'new' });
+  expect(validateProject(p)).toEqual([]);
+});
+it('imports slash Keys to a slash domain, exports physical folders, and detects inconsistent folder markers', async () => {
+  const { inspectImport, planImport, applyImport } = await import('../src/import.js');
+  const { exportMarkdown } = await import('../src/export.js');
+  let p = await fixture();
+  const source = join(p.root, 'source.csv'); await writeFile(source, 'Key,Text\n30/10,first\n30~110,second\n');
+  const inspection = await inspectImport(source);
+  const plan = planImport(p, inspection, { table: 'samples', schema: 'samples', folder: './공격~1방어', sheet: inspection.sheets[0]!.name,
+    header_row: 1, data_start_row: 2, columns: { A: 'key', B: 'text' }, numeric: 'stored',
+    definition: { primary_key: 'key', columns: { key: { type: 'string' }, text: { type: 'text' } } } });
+  expect(plan.canApply).toBe(true);
+  p = (await applyImport(p.root, p.revision, plan)).project;
+  expect(readPath(p, './samples/30~110/text')).toMatchObject({ value: 'first' });
+  expect(readPath(p, 'samples/30~110/text')).toMatchObject({ value: 'second' });
+  expect(listFolders(p)).toContain('./공격~1방어');
+  const output = await mkdtemp(join(tmpdir(), 'vibe-path-export-')); roots.push(output);
+  await exportMarkdown(p, output);
+  expect(await readFile(join(output, folderStorage(p, './공격~1방어'), 'samples.md'), 'utf8')).toContain('30/10');
+  p = (await applyFolderEdit(p.root, p.revision, { op: 'folder-create', path: 'parent' })).project;
+  p = (await applyFolderEdit(p.root, p.revision, { op: 'folder-move', path: './공격~1방어', folder: 'parent' })).project;
+  expect(listFolders(p)).toContain('./parent/공격~1방어');
+  p = (await applyFolderEdit(p.root, p.revision, { op: 'resource-move', kind: 'table', name: 'samples', folder: '' })).project;
+  p = (await applyFolderEdit(p.root, p.revision, { op: 'folder-delete', path: './parent/공격~1방어' })).project;
+  expect(listFolders(p)).not.toContain('./parent/공격~1방어');
+  p = (await applyFolderEdit(p.root, p.revision, { op: 'folder-create', path: './다른~1이름' })).project;
+  const stored = folderStorage(p, './다른~1이름');
+  await writeFile(join(p.root, 'documents', stored, '.gitkeep'), JSON.stringify({ vibe_folder: 1, name: '엇갈림/이름' }));
+  p = await loadProject(p.root);
+  expect(validateProject(p).some(d => d.code === 'FOLDER_NAME_INVALID')).toBe(true);
+});
+it('distinguishes a slash heading from a hierarchy and leaves all legacy spellings and link bytes unchanged', async () => {
+  let p = await fixture();
+  const source = '# A/B\n\nslash\n\n# A\n\n## B\n\nhierarchy\n\n# A~1B\n\nliteral\n\n# A%2FB\n\npercent\n\n[slash](./guide/A~1B) [old](guide/A%2FB) [tilde](guide/A~1B) [percent](guide/A%252FB)';
+  p = (await createDocument(p.root, p.revision, 'guide', source)).project;
+  const view = getDocumentView(p, 'guide');
+  expect(view.diagnostics).toEqual([]);
+  expect(view.links.map(link => link.path)).toEqual(['./guide/A~1B', 'guide/A/B', 'guide/A~1B', 'guide/A%2FB']);
+  expect(readPath(p, './guide/A~1B')).toContain('slash');
+  expect(readPath(p, 'guide/A/B')).toContain('hierarchy');
+  expect(readPath(p, 'guide/A~1B')).toContain('literal');
+  expect(readPath(p, 'guide/A%2FB')).toContain('percent');
+  const result = await saveDocumentSnapshots(p.root, p.revision, [{ name: 'guide', blocks: view.blocks.map(b => ({ original: b.index })) }]);
+  expect(result.changed).toEqual([]); expect(result.project.sources.get('documents/guide.md')).toBe(source);
+});

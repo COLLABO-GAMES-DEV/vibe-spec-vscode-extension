@@ -1,3 +1,4 @@
+import { pathParts, pathFromParts } from '@vibe-spec/core/paths';
 import { getTargetDocumentView, saveTargetDocumentSnapshots, createPlan, writeVariant, listPlans, resourceNameError, createDocument, deleteDocument, editDocument, getDocumentView, listDocuments, loadProject,
   renameResource, whereUsed, addDocumentImage, readPath, resourceFile, saveDocumentSnapshots, getGitStatus, saveProject, VibeError } from '@vibe-spec/core';
 import { execFile } from 'node:child_process';
@@ -147,7 +148,7 @@ export function createDocumentsServer(root: () => string) {
         } else if (message.type === 'documentUsage') return {type:'documentUsages',path:message.path,usages:await whereUsed(project,message.path)};
         else if (message.type === 'documentNavigate') {
           readPath(project,message.path);
-          if (resourceFile(project,'document',message.path.split('/')[0]!)) selected.set(client,message.path.split('/')[0]!);
+          if (resourceFile(project,'document',pathParts(message.path)[0]!)) selected.set(client,pathParts(message.path)[0]!);
           return state(client,true,message.path);
         }
         return state(client, message.type !== 'documentsRefresh' && message.type !== 'ready', message.type === 'documentOpen' ? message.path : undefined);

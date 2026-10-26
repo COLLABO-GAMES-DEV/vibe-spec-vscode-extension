@@ -1,3 +1,4 @@
+import { pathContains } from '@vibe-spec/core/paths';
 import { diffLines } from 'diff';
 import { useEffect, useMemo, useState } from 'react';
 import type { PlanValue, PlanView, Variant } from '@vibe-spec/core';
@@ -12,9 +13,9 @@ function cellText(cell: PlanValue): string { return cell.present ? valueText(cel
 // come from core's comparison, including values inherited from the baseline.
 function touched(variant: Variant | undefined, path: string): boolean {
   if (!variant) return false;
-  return Object.keys(variant.documents ?? {}).some(scope => scope === path || scope.startsWith(path + '/') || path.startsWith(scope + '/')) || Object.hasOwn(variant.set ?? {}, path)
-    || Object.keys(variant.add ?? {}).some(row => path === row || path.startsWith(row + '/'))
-    || (variant.remove ?? []).some(row => path === row || path.startsWith(row + '/'));
+  return Object.keys(variant.documents ?? {}).some(scope => pathContains(path, scope) || pathContains(scope, path)) || Object.hasOwn(variant.set ?? {}, path)
+    || Object.keys(variant.add ?? {}).some(row => pathContains(row, path))
+    || (variant.remove ?? []).some(row => pathContains(row, path));
 }
 function DocumentDifference({ before, after }: { before: string; after: string }) {
   const changes = useMemo(() => diffLines(before, after, { timeout: 100 }), [before, after]);

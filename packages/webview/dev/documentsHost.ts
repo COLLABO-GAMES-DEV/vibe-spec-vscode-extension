@@ -1,3 +1,4 @@
+import { pathParts, pathFromParts } from '@vibe-spec/core/paths';
 import type { DocumentsClientMessage, DocumentsHost, DocumentsHostMessage } from '../src/documentsProtocol';
 export function createFakeDocumentsHost(): DocumentsHost {
   const client = crypto.randomUUID(), listeners = new Set<(message: DocumentsHostMessage) => void>();
@@ -7,8 +8,8 @@ export function createFakeDocumentsHost(): DocumentsHost {
   const emit = (message: DocumentsHostMessage) => {
     if (message.type === 'documentsState' || message.type === 'documentImageAdded') revision = message.revision;
     if (message.type === 'documentFlushResult' && message.state) revision = message.state.revision;
-    if (message.type === 'documentsState' && message.focusPath && !message.documents.some(doc => doc.name === message.focusPath!.split('/')[0])) {
-      const [table, key, column] = message.focusPath.split('/');
+    if (message.type === 'documentsState' && message.focusPath && !message.documents.some(doc => doc.name === pathParts(message.focusPath!)[0])) {
+      const [table, key, column] = pathParts(message.focusPath);
       location.href = '/?table=' + encodeURIComponent(table!) + (key ? '&key=' + encodeURIComponent(key) : '') + (column ? '&column=' + encodeURIComponent(column) : ''); return;
     }
     for (const listener of listeners) listener(message);

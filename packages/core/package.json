@@ -1,8 +1,14 @@
 {
   "name": "@vibe-spec/core",
   "license": "UNLICENSED",
-  "repository": {"type": "git", "url": "https://github.com/COLLABO-GAMES-DEV/vibe-spec-vscode-extension.git", "directory": "packages/core"},
-  "bugs": {"url": "https://github.com/COLLABO-GAMES-DEV/vibe-spec-vscode-extension/issues"},
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/COLLABO-GAMES-DEV/vibe-spec-vscode-extension.git",
+    "directory": "packages/core"
+  },
+  "bugs": {
+    "url": "https://github.com/COLLABO-GAMES-DEV/vibe-spec-vscode-extension/issues"
+  },
   "homepage": "https://github.com/COLLABO-GAMES-DEV/vibe-spec-vscode-extension#readme",
   "version": "0.1.0",
   "private": true,
@@ -19,6 +25,10 @@
     "./names": {
       "types": "./dist/names.d.ts",
       "import": "./dist/names.js"
+    },
+    "./paths": {
+      "types": "./dist/paths.d.ts",
+      "import": "./dist/paths.js"
     }
   },
   "scripts": {

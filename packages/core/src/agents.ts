@@ -158,4 +158,10 @@ A/B는 모두 기존 기준안 위의 대등한 변경분이다. \`read --target
 - Only XLSX numeric cells with exact integer values are normalized during import ("1.0" to "1"). inspect.raw and source inspect preserve the original literal. Consult normalizedInteger/inferredTypes and the plan's normalizations/provenanceFile. imports/*.json stores the original coordinates, values and source hash. Text/date/fractional cells and CSV/TSV are outside this normalization.
 - Use import inspect/plan/apply for automatic XLSX normalization. source inspect remains a raw reader, and ordinary apply does not normalize values.
 - Imports append rows in source order. fmt, row edits and Key renames preserve file order; new rows append. Sorting in the table UI does not rewrite files.
+
+## 이름에 /가 있는 경우
+
+원문 제목·이름표·Key를 바꾸지 않는다. 주소의 구분자는 /이고 이름 안의 /는 ~1, ~는 ~0으로 바꾼 뒤 주소 앞에 ./를 붙인다. 예: Key 30/10 → ./items/30~110. 기존 items/30~110은 문자 그대로의 Key 30~110이다. document read와 folder list가 반환한 주소를 그대로 쓰는 것이 안전하다. where-used·rename 대상·기획 대안의 set/documents 주소도 동일하다. 대안에는 core가 반환한 canonical 주소를 쓴다.
+
+apply JSON의 key와 ref 칸, rename --to 같은 새 이름 인자에는 이스케이프하지 않은 원문을 넣는다. Markdown 링크 목적지는 <...>로 감싸고 원문 %는 %25로 URI 인코딩한다. 전체 주소를 URI 디코딩해 구분자와 이름을 혼동하지 않는다. 폴더도 ./공격~1방어 형태로 만들고 CLI로 이동한다. 실제 디렉터리명과 .gitkeep의 원래 이름 기록을 수동으로 편집하지 않는다. 파일명인 테이블·스키마·문서의 Windows 안전 규칙은 유지한다.
 `;

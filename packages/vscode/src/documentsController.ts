@@ -1,3 +1,4 @@
+import { pathContains } from '@vibe-spec/core/paths';
 import * as vscode from 'vscode';
 import { randomUUID } from 'node:crypto';
 import { realpath } from 'node:fs/promises';
@@ -282,7 +283,7 @@ export class DocumentsController implements vscode.TreeDataProvider<vscode.TreeI
     name ??= await vscode.window.showQuickPick(listDocuments(project).map(document => document.name).sort(compareResourceNames), { placeHolder: '문서 선택' });
     if (!name) return;
     getDocumentView(project, name);
-    if (path && path !== name && !path.startsWith(name + '/')) throw new VibeError('PATH_INVALID', '열 문서의 경로를 선택해 주세요.');
+    if (path && path !== name && !pathContains(name, path)) throw new VibeError('PATH_INVALID', '열 문서의 경로를 선택해 주세요.');
     this.requireRoot(project.root);
     for (const session of this.panels.values()) if (session.root !== project.root && !session.dirty && !session.flush) session.panel.dispose();
     const existing = this.panels.get(this.key(project.root, name));
@@ -422,7 +423,7 @@ export class DocumentsController implements vscode.TreeDataProvider<vscode.TreeI
         result = await createDocument(root, message.revision, message.name, '');
       } else if (message.type === 'documentRename') {
         if (!['document', 'heading', 'tag'].includes(message.kind) || !session.name || typeof message.path !== 'string'
-          || (message.kind === 'document' ? message.path !== session.name : !message.path.startsWith(session.name + '/'))) {
+          || (message.kind === 'document' ? message.path !== session.name : (!pathContains(session.name, message.path) || message.path === session.name))) {
           throw new VibeError('INVALID_EDIT', '열린 문서의 이름·제목·이름표를 선택해 주세요.');
         }
         if (message.kind === 'document') this.requireRenameTargetClosed(root, session.name, message.to);

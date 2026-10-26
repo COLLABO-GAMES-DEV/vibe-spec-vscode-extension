@@ -103,4 +103,10 @@ description: CSV·TSV·XLSX와 Notion 내보내기 ZIP을 조사하고 구조·K
 ## XLSX 정수 예외
 
 XLSX 숫자 셀의 값이 정확한 정수이면 이관값은 정수 문자열이다(1.0 → 1). 텍스트 "1.0", 소수·날짜와 CSV/TSV는 정규화하지 않는다. inspect의 raw는 원문이며 normalizedInteger는 이관 후보다. 최종 값이 모두 정수 문법인 열에는 integer를 제안하고 Key도 integer를 사용할 수 있다. 원문/변환값은 plan.normalizations와 imports/*.json provenance로 확인한다. 자동 정규화와 출처 기록에는 import inspect/plan/apply를 사용한다. source inspect는 원문 조사이고 일반 apply는 정규화하지 않는다. 일반 편집에서는 이 변환을 반복하지 않는다. 이관 행은 시트 순서이며 fmt와 편집은 파일 순서를 보존한다.
+
+## 이름에 /가 있는 경우
+
+원문 제목·이름표·Key를 바꾸지 않는다. 주소의 구분자는 /이고 이름 안의 /는 ~1, ~는 ~0으로 바꾼 뒤 주소 앞에 ./를 붙인다. 예: Key 30/10 → ./items/30~110. 기존 items/30~110은 문자 그대로의 Key 30~110이다. document read와 folder list가 반환한 주소를 그대로 쓰는 것이 안전하다. where-used·rename 대상·기획 대안의 set/documents 주소도 동일하다. 대안에는 core가 반환한 canonical 주소를 쓴다.
+
+apply JSON의 key와 ref 칸, rename --to 같은 새 이름 인자에는 이스케이프하지 않은 원문을 넣는다. Markdown 링크 목적지는 <...>로 감싸고 원문 %는 %25로 URI 인코딩한다. 전체 주소를 URI 디코딩해 구분자와 이름을 혼동하지 않는다. 폴더도 ./공격~1방어 형태로 만들고 CLI로 이동한다. 실제 디렉터리명과 .gitkeep의 원래 이름 기록을 수동으로 편집하지 않는다. 파일명인 테이블·스키마·문서의 Windows 안전 규칙은 유지한다.
 `;

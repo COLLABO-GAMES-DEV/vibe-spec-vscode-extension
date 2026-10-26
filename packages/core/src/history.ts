@@ -1,3 +1,4 @@
+import { pathFromParts } from './paths.js';
 import { resourceEntry } from './resources.js';
 import { isDeepStrictEqual } from 'node:util';
 import { isMap, isScalar, isSeq } from 'yaml';
@@ -201,7 +202,7 @@ export class ScreenHistory {
       if (JSON.stringify(references(current, entry.table, from)) !== JSON.stringify(expected)) {
         throw new VibeError('HISTORY_CONFLICT', 'References changed outside this editor; the Key cannot be safely renamed back.');
       }
-      result = await renameResource(root, expectedRevision, 'key', entry.table + '/' + from, to);
+      result = await renameResource(root, expectedRevision, 'key', pathFromParts([entry.table, from]), to);
     } else {
       result = await mutateProject(root, expectedRevision, current => {
         for (const change of entry.changes) {

@@ -134,7 +134,6 @@ describe('row edits and batches', () => {
     { op: 'create', table: 'items', row: { code: 'currency_gold', name: 'duplicate' } },
     { op: 'create', table: 'items', row: { name: 'missing key' } },
     { op: 'create', table: 'items', row: { code: '', name: 'empty key' } },
-    { op: 'create', table: 'items', row: { code: 'bad/key', name: 'slash' } },
     { op: 'create', table: 'items', row: { code: '*', name: 'reserved' } },
     { op: 'update', table: 'items', key: 'currency_gold', values: { code: 'different' } },
     { op: 'update', table: 'items', key: 'absent', values: { name: 'missing' } },
@@ -375,7 +374,6 @@ describe('name-based lookup and rename', () => {
 
   it.each([
     ['key', 'items/currency_gold', 'consumable_potion'],
-    ['key', 'items/currency_gold', 'bad/key'],
     ['key', 'items/currency_gold', '*'],
     ['key', 'items', 'new_key'],
     ['table', 'items', 'offers'],

@@ -1,3 +1,4 @@
+import { pathParts, pathFromParts } from '@vibe-spec/core/paths';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ClipboardEvent, DragEvent, KeyboardEvent, PointerEvent } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
@@ -507,7 +508,7 @@ export function App({ host }: { host: Host }) {
             onContextMenu={event => { event.preventDefault(); if (shortcut(event)) return;
               withCommit(() => { if (selectedKeys(key).length === 1) select({ cell: { key, column: snapshot.schema.primary_key }, focus: true, row: true }); setMenu({ key, x: event.clientX, y: event.clientY }); }); }}>
             {view.columns.map(([column], index) => {
-              const cell = { key, column }, issues = diagnostics.get(`${snapshot.table}/${key}/${column}`) ?? [];
+              const cell = { key, column }, issues = diagnostics.get(pathFromParts([snapshot.table, key, column])) ?? [];
               const selected = bounds && rowPosition >= bounds.top && rowPosition <= bounds.bottom && index >= bounds.left && index <= bounds.right;
               return <div role="gridcell" aria-label={`${key}/${column}`} aria-selected={Boolean(selected)} aria-invalid={issues.length > 0}
                 data-active={sameCell(active, cell)} tabIndex={-1} key={column}
@@ -548,7 +549,7 @@ export function App({ host }: { host: Host }) {
       <button disabled={pending || !conflictRow || !definition} onClick={() => commit(undefined, true)}>내 입력 적용</button><button disabled={pending} onClick={cancel}>파일 값 사용</button></section>}
     <section className="diagnostics" aria-label="검증 오류"><h2>검증 오류 {snapshot.diagnostics.length}</h2>
       {!snapshot.diagnostics.length ? <p className="muted">검증 오류가 없습니다.</p> : <ul>{snapshot.diagnostics.map((item, index) => <li key={index}><button onClick={() => {
-        const [table, key, column] = item.path.split('/'); if (table === snapshot.table && key && column) navigate({ cell: { key, column }, focus: true });
+        const [table, key, column] = pathParts(item.path); if (table === snapshot.table && key && column) navigate({ cell: { key, column }, focus: true });
       }}><code>{item.path || item.file}</code> {item.message}</button></li>)}</ul>}
     </section>
     <UsagePanel host={host} />

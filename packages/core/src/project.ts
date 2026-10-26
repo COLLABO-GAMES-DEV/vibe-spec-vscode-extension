@@ -1,7 +1,9 @@
+import { folderAddress } from './folder-names.js';
+import { pathParts, canonicalPath } from './paths.js';
 import { createHash } from 'node:crypto';
 import { lstat, mkdir, open, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
-import { VibeError, isRecord, validName } from './types.js';
+import { VibeError, isRecord } from './types.js';
 import type { Diagnostic, MutationOptions, Project, YamlFile } from './types.js';
 import { formatYaml, parseYaml } from './yaml.js';
 import { tableContexts, validateProject } from './validation.js';
@@ -166,7 +168,14 @@ function resourceDiagnostics(sources: ReadonlyMap<string, string>, directories: 
     const folder = parts.join('/');
     const error = folderError(folder);
     if (error) result.push({ code: 'FOLDER_NAME_INVALID', file: directory, path: folder, message: error });
-    const key = (root === 'schemas' ? 'schema/' : 'domain/') + parts.slice(0, -1).map(resourceNameKey).join('/') + '/' + resourceNameKey(parts.at(-1)!);
+    let logical = folder;
+    try { if (root !== 'schemas') logical = folderAddress({ sources, directories }, folder); }
+    catch (error) {
+      result.push({ code: 'FOLDER_NAME_INVALID', file: directory, path: folder, message: error instanceof Error ? error.message : String(error) });
+      continue;
+    }
+    const logicalParts = pathParts(logical);
+    const key = (root === 'schemas' ? 'schema/' : 'domain/') + JSON.stringify(logicalParts.map(resourceNameKey));
     if (!folderGroups.has(key)) folderGroups.set(key, new Map());
     const names = folderGroups.get(key)!;
     names.set(parts.at(-1)!, [...(names.get(parts.at(-1)!) ?? []), directory]);
@@ -254,9 +263,10 @@ function lfChanges(project: Project, changes: ReadonlyMap<string, string | null>
 }
 
 export function readPath(project: Project, path: string): unknown {
-  const parts = path.split('/');
+  const parts = pathParts(path);
+  path = canonicalPath(path);
   if (resourceFile(project, 'document', parts[0]!) !== undefined) return readDocumentPath(project, path);
-  if (parts.some(part => !validName(part)) || parts.length > 3) {
+  if (parts.some(part => !part) || parts.length > 3) {
     throw new VibeError('PATH_INVALID', 'Expected table, table/key, table/*/column or table/key/column.');
   }
   const [name, key, column] = parts;

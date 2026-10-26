@@ -190,7 +190,7 @@ describe('schema, values and references', () => {
     const p = await project({ 'schemas/items.yaml': (await schemaText('items')).replace('primary_key: code', primary) });
     expect(codes(p)).toContain(code);
   });
-  it.each(['""', 'null', '"a/b"', '"*"'])('rejects invalid Key %s', async value => {
+  it.each(['""', 'null', '"*"'])('rejects invalid Key %s', async value => {
     const p = await project({ 'tables/items.yaml': (await tableText('items')).replace('"currency_gold"', value) });
     expect(codes(p)).toContain('KEY_REQUIRED');
   });

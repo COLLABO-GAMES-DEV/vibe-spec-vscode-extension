@@ -1,3 +1,4 @@
+import { pathParts, pathFromParts } from '@vibe-spec/core/paths';
 import { DocumentsController } from './documentsController.js';
 import * as vscode from 'vscode';
 import { watch as watchDirectory } from 'node:fs';
@@ -64,10 +65,10 @@ export async function activate(context: vscode.ExtensionContext) {
   const plans = new PlansController(context, getProject, refresh);
   context.subscriptions.push(plans);
   const documents = new DocumentsController(context, getProject, refresh, async path => {
-    if (project && resourceFile(project, 'document', path.split('/')[0]!)) {
-      await documents.open(path.split('/')[0], path); return;
+    if (project && resourceFile(project, 'document', pathParts(path)[0]!)) {
+      await documents.open(pathParts(path)[0], path); return;
     }
-    const [table, key, column] = path.split('/');
+    const [table, key, column] = pathParts(path);
     if (key && column && key !== '*') await openAndFocus(table!, {key,column});
     else if (key && key !== '*' && project) await openAndFocus(table!, {key,column:getTableView(project,table!).schema.primary_key,row:true});
     else await openTable(table);
@@ -207,14 +208,14 @@ export async function activate(context: vscode.ExtensionContext) {
           await openAndFocus(target.table, { key: target.key, column: target.column, row: true }); return;
         }
         if (message.type === 'whereUsed') {
-          const result = await whereUsed(project, table + '/' + message.key);
+          const result = await whereUsed(project, pathFromParts([table, message.key]));
           usages.set(table, result);
           post(panel, { type: 'usages', key: message.key, result }); return;
         }
         if (message.type === 'openUsage') {
           const usage = usages.get(table)?.[message.kind]?.[message.index];
           if (!usage) throw new VibeError('PATH_NOT_FOUND', 'Choose an existing usage result.');
-          const [target, key, column, extra] = usage.path.split('/');
+          const [target, key, column, extra] = pathParts(usage.path);
           if (resourceEntry(usage.file)?.kind === 'document') {
             await documents.open(resourceEntry(usage.file)!.name, usage.path || undefined);
           } else if (usage.file.startsWith('tables/') && target && key && column && !extra) {
@@ -241,7 +242,7 @@ export async function activate(context: vscode.ExtensionContext) {
           result = await applyEdits(panelRoot, message.revision, message.operations);
           history.recordCells(result, message.operations);
         } else if (message.type === 'rename') {
-          result = await renameResource(panelRoot, message.revision, 'key', table + '/' + message.key, message.to);
+          result = await renameResource(panelRoot, message.revision, 'key', pathFromParts([table, message.key]), message.to);
           history.recordRename(result, table, message.key, message.to);
         } else if (message.type === 'structureEdit') {
           if (message.operation.table !== table || !message.operation.op.startsWith('column-')) throw new VibeError('INVALID_EDIT', '현재 표의 열을 선택해 주세요.');
@@ -285,8 +286,8 @@ export async function activate(context: vscode.ExtensionContext) {
   async function openError(diagnostic: Diagnostic) {
     if (resourceEntry(diagnostic.file)?.kind === 'document') {
       await documents.open(resourceEntry(diagnostic.file)!.name, diagnostic.path || undefined);
-    } else if (diagnostic.file.startsWith('tables/') && diagnostic.path.split('/').length === 3) {
-      const [table, key, column] = diagnostic.path.split('/');
+    } else if (diagnostic.file.startsWith('tables/') && pathParts(diagnostic.path).length === 3) {
+      const [table, key, column] = pathParts(diagnostic.path);
       await openAndFocus(table!, { key: key!, column: column! });
     } else if (planningRoot) {
       const document = await vscode.workspace.openTextDocument(vscode.Uri.joinPath(vscode.Uri.file(planningRoot), diagnostic.file));

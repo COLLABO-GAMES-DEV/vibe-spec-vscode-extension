@@ -1,3 +1,5 @@
+import { newFolderMarkers } from './folder-names.js';
+import { pathParts, pathFromParts } from './paths.js';
 import { createHash } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import { isSeq, stringify } from 'yaml';
@@ -48,7 +50,15 @@ function prepare(project: Project, inspection: ImportInspection, mapping: Import
     code, severity: 'warning', message, sheet: sheet.name, ...(cell ? { cell } : {}),
   });
   const schemaPath = resourceFile(project, 'schema', mapping.schema) ?? resourcePath('schema', mapping.schema);
-  const tablePath = resourcePath('table', mapping.table, mapping.folder);
+  const changes = new Map<string, string>();
+  let tablePath = 'tables/' + mapping.table + '.yaml';
+  try {
+    tablePath = resourcePath('table', mapping.table, mapping.folder, project);
+    for (const [file, source] of newFolderMarkers(project, mapping.folder ?? '')) changes.set(file, source);
+  } catch (cause) {
+    if (!(cause instanceof VibeError)) throw cause;
+    error('IMPORT_NAME_EXISTS', cause.message);
+  }
   for (const [kind, name, path] of [['schema', mapping.schema, schemaPath], ['table', mapping.table, tablePath]] as const) {
     const entries = resourceEntries(project).filter(entry => kind === 'schema' ? entry.kind === kind : entry.kind !== 'schema');
     if (entries.some(entry => entry.file !== path && resourceNameKey(entry.name) === resourceNameKey(name))) {
@@ -56,14 +66,13 @@ function prepare(project: Project, inspection: ImportInspection, mapping: Import
     }
   }
   const folders = listFolders(project);
-  const parts = (mapping.folder ?? '').split('/');
+  const parts = pathParts(mapping.folder ?? '');
   for (let i = 1; i <= parts.length; i++) {
-    const folder = parts.slice(0, i).join('/');
+    const folder = pathFromParts(parts.slice(0, i));
     if (folders.some(other => other !== folder && resourceNameKey(other) === resourceNameKey(folder))) {
       error('IMPORT_NAME_EXISTS', 'The destination folder has a different case or Unicode spelling: ' + folder);
     }
   }
-  const changes = new Map<string, string>();
   const rows: ImportPlan['rows'] = [];
   const normalizations: NonNullable<ImportPlan['normalizations']> = [];
   const schemaFile = project.files.get(schemaPath);
@@ -143,7 +152,7 @@ function prepare(project: Project, inspection: ImportInspection, mapping: Import
         values[target] = value;
       }
       const key = values[schema.primary_key], keyColumn = mapped.find(([, target]) => target === schema.primary_key)?.[0] ?? '';
-      if (typeof key !== 'string' || !validName(key) || key === '*') error('IMPORT_KEY', 'A nonempty Key without / or reserved * is required.', keyColumn + row);
+      if (typeof key !== 'string' || !key.length || key === '*') error('IMPORT_KEY', 'A nonempty Key without reserved * is required.', keyColumn + row);
       else if (keys.has(key)) error('IMPORT_KEY_DUPLICATE', 'Key already exists in the target or source: ' + key, keyColumn + row);
       else keys.add(key);
       rows.push({ sourceRow: row, values });

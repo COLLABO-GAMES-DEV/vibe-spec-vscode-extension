@@ -1,3 +1,4 @@
+import { pathFromParts } from './paths.js';
 import { isRecord, VibeError } from './types.js';
 import type { Diagnostic, EditOperation, Project } from './types.js';
 import { tableContexts } from './validation.js';
@@ -20,7 +21,7 @@ export function assertCompleteCellInputs(project: Project, operations: EditOpera
       if (type !== 'integer' && type !== 'decimal' || typeof value !== 'string' || !unfinishedNumber.test(value)) continue;
       const key = operation.op === 'create' ? values[context.schema.primary_key] : operation.key;
       diagnostics.push({ code: 'INCOMPLETE_NUMBER', file: context.file.file,
-        path: operation.table + '/' + String(key) + '/' + field,
+        path: pathFromParts([operation.table, String(key), field]),
         message: 'Finish the numeric literal before committing; the draft is kept.' });
     }
   }

@@ -153,3 +153,25 @@ it('imports into a nested destination and rejects unsafe or stale folder writes 
   write(root, ['folder', 'delete', '보관'], 2);
   expect(await readFile(join(root, 'tables/보관/unmanaged.txt'), 'utf8')).toBe('keep');
 }, process.platform === 'win32' ? 120_000 : 60_000);
+
+it('uses explicit escaped addresses for raw slash Keys, document scopes and domain names', async () => {
+  const root = await setup();
+  write(root, ['rename', 'key', 'items/currency_gold', '--to', 'coin/blue~1']);
+  expect(cli(root, ['read', './items/coin~1blue~01/name']).data).toMatchObject({ value: '골드' });
+  expect(cli<{ references: { file: string }[] }>(root, ['where-used', './items/coin~1blue~01']).data.references.some(item => item.file === 'tables/offers.yaml')).toBe(true);
+  write(root, ['folder', 'create', '분류~1보상']);
+  write(root, ['folder', 'create', './분류~1보상']);
+  write(root, ['move', 'table', 'items', '--folder', './분류~1보상']);
+  expect(cli(root, ['folder', 'list']).data).toEqual(expect.arrayContaining(['분류~1보상', './분류~1보상']));
+  const source = '# 공격 / 방어\r\n\r\n<!-- name: 이름/표~1 -->\r\n[값](./items/coin~1blue~01/name)\r\n';
+  const markdown = join(root, 'source.md'); await writeFile(markdown, source);
+  write(root, ['document', 'create', 'guide', '--input', markdown, '--folder', './분류~1보상']);
+  expect(cli<string>(root, ['read', './guide/공격 ~1 방어/이름~1표~01']).data).toContain('[값]');
+  write(root, ['rename', 'heading', './guide/공격 ~1 방어', '--to', '새/제목']);
+  expect(cli<string>(root, ['read', './guide/새~1제목/이름~1표~01']).data).toContain('[값]');
+  write(root, ['rename', 'key', './items/coin~1blue~01', '--to', 'coin/red']);
+  expect(cli<string>(root, ['read', 'guide']).data).toContain('(./items/coin~1red/name)');
+  expect(cli(root, ['validate']).diagnostics).toEqual([]);
+  cli(root, ['fmt']);
+  expect(cli<{ changed: string[] }>(root, ['fmt', '--check']).data.changed).toEqual([]);
+});

@@ -1,3 +1,4 @@
+import { appendPath, canonicalPath } from './paths.js';
 import { unified } from 'unified';
 import remarkParse from 'remark-parse';
 import remarkGfm from 'remark-gfm';
@@ -156,9 +157,9 @@ export function parseMarkdown(name: string, source: string): ParsedDocument {
   };
   function assignPath(block: DocumentBlock, segment: string): string {
     const parent = headings.at(-1)?.path ?? name;
-    const path = parent + '/' + segment;
-    if (!segment.trim() || /[/\r\n]/.test(segment)) {
-      diagnostic('DOCUMENT_NAME_INVALID', path, 'Heading and tag names must be nonempty and cannot contain / or line breaks.');
+    const path = appendPath(parent, segment);
+    if (!segment.trim() || /[\r\n]/.test(segment)) {
+      diagnostic('DOCUMENT_NAME_INVALID', path, 'Heading and tag names must be nonempty and cannot contain line breaks.');
     }
     if (named.has(path)) diagnostic('DOCUMENT_PATH_DUPLICATE', path, 'Headings and tags must be unique under the same parent.');
     named.add(path);
@@ -179,7 +180,11 @@ export function parseMarkdown(name: string, source: string): ParsedDocument {
       diagnostic('DOCUMENT_LINK_UNSUPPORTED', name, 'Cannot locate this link destination safely.', true);
       return;
     }
-    const destination = target.url, path = decodeDestination(destination);
+    const destination = target.url;
+    let path = decodeDestination(destination);
+    if (path.startsWith('./')) {
+      try { path = canonicalPath(path); } catch { /* Validation reports malformed addresses without rewriting source. */ }
+    }
     const external = /^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(path);
     image ||= /^assets\//.test(path);
     const kind: DocumentLink['kind'] = image ? 'image' : external ? 'external' : 'resource';

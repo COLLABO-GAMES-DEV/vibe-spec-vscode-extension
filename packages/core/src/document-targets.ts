@@ -1,3 +1,4 @@
+import { pathParts, pathContains } from './paths.js';
 import { isDeepStrictEqual } from 'node:util';
 import { parseMarkdown } from './document-parser.js';
 import type { DocumentOperation, DocumentSnapshot, DocumentView } from './document-types.js';
@@ -29,16 +30,16 @@ export function getTargetDocumentView(project: Project, name: string, target = '
     const [plan, variant] = targetParts(target);
     const input = getPlan(project, plan).variants[variant];
     composed = readVariant(project, plan, variant);
-    persistedScopes = Object.keys(input?.documents ?? {}).filter(path => path.split('/')[0] === name);
+    persistedScopes = Object.keys(input?.documents ?? {}).filter(path => pathParts(path)[0] === name);
     selectedScopes = [...new Set([...persistedScopes, ...(scopes ?? [])])];
     // Validate even empty/unchanged selections against overlapping scopes.
     documentVariantChanges(composed, Object.fromEntries(selectedScopes.map(path => {
-      if (path.split('/')[0] !== name) throw new VibeError('DOCUMENT_SCOPE', 'Choose a scope in the open document.');
+      if (pathParts(path)[0] !== name) throw new VibeError('DOCUMENT_SCOPE', 'Choose a scope in the open document.');
       return [path, documentScope(composed, path).markdown];
     })));
   }
   const view = getDocumentView(composed, name);
-  if (target !== 'base') view.diagnostics.push(...getPlan(project, targetParts(target)[0]).diagnostics.filter(d => d.code === 'BASE_CHANGED' && (d.path === name || d.path.startsWith(name + '/')) && d.file.endsWith('/' + targetParts(target)[1] + '.yaml')));
+  if (target !== 'base') view.diagnostics.push(...getPlan(project, targetParts(target)[0]).diagnostics.filter(d => d.code === 'BASE_CHANGED' && pathContains(name, d.path) && d.file.endsWith('/' + targetParts(target)[1] + '.yaml')));
   let targets = ['base'];
   try { targets.push(...listPlans(project).filter(p => p.status !== 'approved').flatMap(p => p.variants.map(v => p.name + '/' + v))); } catch (error) { if (!(error instanceof VibeError)) throw error; }
   return { ...view, target, scopes: documentScopes(composed, name), selectedScopes, persistedScopes, targets };

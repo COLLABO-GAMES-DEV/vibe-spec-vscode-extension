@@ -1,3 +1,4 @@
+import { pathFromParts, appendPath } from './paths.js';
 import { resourceEntry, resourceFile } from './resources.js';
 import { documentDiagnostics } from './documents.js';
 import { Ajv } from 'ajv';
@@ -203,19 +204,19 @@ export function validateBaseline(project: Project): Diagnostic[] {
     const seenKeys = new Set<string>();
     for (const [index, row] of table.rows.entries()) {
       const key = row[schema.primary_key];
-      const path = typeof key === 'string' && validName(key) ? name + '/' + key : name;
-      if (typeof key !== 'string' || !validName(key) || key === '*') {
-        errors.push(issue('KEY_REQUIRED', file.file, path, 'Row ' + (index + 1) + ' needs a nonempty Key without / or reserved *.'));
+      const path = typeof key === 'string' && key.length ? pathFromParts([name, key]) : name;
+      if (typeof key !== 'string' || !key.length || key === '*') {
+        errors.push(issue('KEY_REQUIRED', file.file, path, 'Row ' + (index + 1) + ' needs a nonempty Key without reserved *.'));
       } else if (seenKeys.has(key)) {
         errors.push(issue('KEY_DUPLICATE', file.file, path, 'Duplicate primary Key.'));
       } else seenKeys.add(key);
       for (const field of Object.keys(row)) {
         if (!Object.hasOwn(schema.columns, field)) {
-          errors.push(issue('COLUMN_UNKNOWN', file.file, path + '/' + field, 'Column is not declared.'));
+          errors.push(issue('COLUMN_UNKNOWN', file.file, appendPath(path, field), 'Column is not declared.'));
         }
       }
       for (const [field, column] of Object.entries(schema.columns)) {
-        const location = path + '/' + field;
+        const location = appendPath(path, field);
         if (!Object.hasOwn(row, field)) {
           if (column.required && field !== schema.primary_key) {
             errors.push(issue('VALUE_REQUIRED', file.file, location, 'Required value is missing.'));
@@ -235,7 +236,7 @@ export function validateBaseline(project: Project): Diagnostic[] {
           errors.push(issue('STRING_STYLE', file.file, location, 'Cell strings must be quoted on one physical line; use fmt.'));
         }
         if (column.type === 'ref' && value !== null) {
-          if (typeof value !== 'string' || !validName(value) || value === '*' ||
+          if (typeof value !== 'string' || !value.length || value === '*' ||
               !targetKeys.get(column.table!)?.has(value)) {
             errors.push(issue('REF_MISSING', file.file, location,
               'Expected a Key in ' + column.table + ', not a full path.'));
@@ -255,7 +256,7 @@ export function validateBaseline(project: Project): Diagnostic[] {
         if (fields.some(field => row[field] == null || checkValue(row[field], schema.columns[field]!))) continue;
         const token = JSON.stringify(fields.map(field => uniqueValue(row[field], schema.columns[field]!)));
         if (seen.has(token)) {
-          errors.push(issue('UNIQUE_VIOLATION', file.file, name + '/' + String(row[schema.primary_key]),
+          errors.push(issue('UNIQUE_VIOLATION', file.file, pathFromParts([name, String(row[schema.primary_key])]),
             'Duplicate values for ' + fields.join(', ')));
         }
         seen.add(token);
@@ -280,7 +281,7 @@ export function deletionDiagnostics(project: Project, table: string, key: string
         // References removed with the target row do not survive the deletion.
         if (name === table && row[primaryKey] === key) continue;
         if (row[field] === key) errors.push(issue('DELETE_RESTRICTED', reference.file.file,
-          name + '/' + String(row[primaryKey] ?? '') + '/' + field,
+          pathFromParts([name, String(row[primaryKey] ?? ''), field]),
           'This declared reference prevents deletion of ' + table + '/' + key));
       }
   }

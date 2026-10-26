@@ -1,9 +1,10 @@
+import { pathFromParts } from './paths.js';
 import { resourceEntries, resourceEntry, resourceFile } from './resources.js';
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join, relative, resolve } from 'node:path';
 import { isMap, isScalar } from 'yaml';
 import type { Diagnostic, Project, Table, TableSchema } from './types.js';
-import { isRecord, validName, VibeError } from './types.js';
+import { isRecord, VibeError } from './types.js';
 import { loadProject, readPath } from './project.js';
 import { validateProject } from './validation.js';
 import { tableContexts } from './validation.js';
@@ -59,10 +60,10 @@ export function resolveReference(project: Project, tableName: string, key: strin
   const { schema } = readPath(project, tableName) as { schema: TableSchema };
   const definition = schema.columns[column];
   if (definition?.type !== 'ref' || !definition.table) throw new VibeError('REFERENCE_REQUIRED', 'This column is not a reference.');
-  const row = readPath(project, tableName + '/' + key) as Record<string, unknown>;
+  const row = readPath(project, pathFromParts([tableName, key])) as Record<string, unknown>;
   const value = row[column];
-  if (typeof value !== 'string' || !validName(value) || value === '*') throw new VibeError('REF_MISSING', 'The cell does not contain a target Key.');
-  readPath(project, definition.table + '/' + value);
+  if (typeof value !== 'string' || !value.length || value === '*') throw new VibeError('REF_MISSING', 'The cell does not contain a target Key.');
+  readPath(project, pathFromParts([definition.table, value]));
   const target = readPath(project, definition.table) as { schema: TableSchema };
   return { table: definition.table, key: value, column: target.schema.primary_key };
 }

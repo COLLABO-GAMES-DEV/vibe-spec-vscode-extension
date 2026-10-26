@@ -1,3 +1,4 @@
+import { pathParts, pathFromParts, appendPath } from './paths.js';
 import { documentPathMatches, rewriteMarkdownPaths } from './document-references.js';
 import { markdownTree, nodeStart, parseMarkdown, nameComment } from './document-parser.js';
 import { headingNameEdit } from './documents.js';
@@ -22,24 +23,24 @@ export function hasPlanAddedRow(project: Project, path: string): boolean {
 export function renamePlanReferences(project: Project, kind: RenameKind, path: string, to: string): Map<string, string> {
   const changes = new Map<string, string>();
   if (kind === 'schema') return changes;
-  const [table, key, column] = path.split('/');
+  const [table, key, column] = pathParts(path);
   const contexts = tableContexts(project), target = contexts.get(table!);
   const references = declaredReferences(project);
   const shared = new Set([...contexts].filter(([, item]) => item.table.schema === target?.table.schema).map(([name]) => name));
   function address(value: string): string {
-    const parts = value.split('/');
+    const parts = pathParts(value);
     if ((kind === 'table' || kind === 'document') && parts[0] === table) parts[0] = to;
     if (kind === 'key' && parts[0] === table && parts[1] === key) parts[1] = to;
     if (kind === 'column' && shared.has(parts[0]!) && parts[2] === column) parts[2] = to;
-    if ((kind === 'heading' || kind === 'tag') && documentPathMatches(value, path)) parts[path.split('/').length - 1] = to;
-    return parts.join('/');
+    if ((kind === 'heading' || kind === 'tag') && documentPathMatches(value, path)) parts[pathParts(path).length - 1] = to;
+    return pathFromParts(parts);
   }
   function fieldValue(name: string, field: string, value: unknown): unknown {
     const reference = references.find(item => item.name === name && item.field === field);
     return kind === 'key' && reference?.target === table && value === key ? to : value;
   }
   function valueAt(location: string, value: unknown): unknown {
-    const [name, row, field] = location.split('/');
+    const [name, row, field] = pathParts(location);
     if (field !== undefined) return fieldValue(name!, field, value);
     if (!isRecord(value)) return value;
     const result = Object.create(null) as Record<string, unknown>;
@@ -78,10 +79,10 @@ export function renamePlanReferences(project: Project, kind: RenameKind, path: s
         if (Object.hasOwn(renamed, next)) throw new VibeError('NAME_EXISTS', 'A variant already uses scope: ' + next);
         let value = raw;
         if ((kind === 'heading' || kind === 'tag') && documentPathMatches(path, location)) {
-          const name = location.split('/')[0]!;
+          const name = pathParts(location)[0]!;
           const blocks = parseMarkdown(name, raw).blocks;
-          const parent = location.split('/').slice(1, -1);
-          const relativePath = (p: string) => location === name ? p : [name, ...parent, ...p.split('/').slice(1)].join('/');
+          const parent = pathParts(location).slice(1, -1);
+          const relativePath = (p: string) => location === name ? p : pathFromParts([name, ...parent, ...pathParts(p).slice(1)]);
           const block = blocks.find(b => b.path && relativePath(b.path) === path);
           if (block) {
             if (kind === 'heading') {
@@ -94,7 +95,7 @@ export function renamePlanReferences(project: Project, kind: RenameKind, path: s
             }
           }
         }
-        renamed[next] = rewriteMarkdownPaths(next.split('/')[0]!, value, address);
+        renamed[next] = rewriteMarkdownPaths(pathParts(next)[0]!, value, address);
       }
       data[section] = renamed;
     }
@@ -104,7 +105,7 @@ export function renamePlanReferences(project: Project, kind: RenameKind, path: s
 }
 
 export function planUsages(project: Project, path: string): Usages {
-  const [target, key, column] = path.split('/'), needle = column ?? key ?? target!;
+  const [target, key, column] = pathParts(path), needle = column ?? key ?? target!;
   const result: Usages = { references: [], candidates: [] };
   const references = declaredReferences(project);
   function usage(file: YamlFile, parts: (string | number)[], list: Usage[]) {
@@ -116,7 +117,7 @@ export function planUsages(project: Project, path: string): Usages {
     });
   }
   function matches(location: string): boolean {
-    const [name, row, field] = location.split('/');
+    const [name, row, field] = pathParts(location);
     return name === target && (key === undefined || key === '*' || key === row) && (column === undefined || column === field);
   }
   function cell(file: YamlFile, parts: (string | number)[], table: string, field: string, value: unknown) {
@@ -137,11 +138,11 @@ export function planUsages(project: Project, path: string): Usages {
       const mapping = file.data[section];
       if (!isRecord(mapping)) continue;
       for (const [location, value] of Object.entries(mapping)) {
-        const parts = [section, location], [name, , field] = location.split('/');
+        const parts = [section, location], [name, , field] = pathParts(location);
         if (matches(location)) usage(file, parts, result.references);
         if (field !== undefined) cell(file, parts, name!, field, value);
         else if (isRecord(value)) for (const [code, raw] of Object.entries(value)) {
-          if (matches(location + '/' + code)) usage(file, [...parts, code], result.references);
+          if (matches(appendPath(location, code))) usage(file, [...parts, code], result.references);
           cell(file, [...parts, code], name!, code, raw);
         }
       }
@@ -159,7 +160,7 @@ export function planUsages(project: Project, path: string): Usages {
         const parts = [section, location];
         if (documentPathMatches(location, path)) usage(file, parts, result.references);
         if (typeof value !== 'string') continue;
-        const parsed = parseMarkdown(location.split('/')[0]!, value);
+        const parsed = parseMarkdown(pathParts(location)[0]!, value);
         if (parsed.links.some(link => link.kind === 'resource' && link.path && documentPathMatches(link.path, path, true))) usage(file, parts, result.references);
         let prose = value;
         for (const link of [...parsed.links].sort((a, b) => b.start - a.start)) prose = prose.slice(0, link.start) + prose.slice(link.end);

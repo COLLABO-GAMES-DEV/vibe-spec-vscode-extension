@@ -1,3 +1,4 @@
+import { pathParts, pathFromParts, appendPath, canonicalPath } from './paths.js';
 import { documentScope, documentVariantChanges } from './document-variants.js';
 import { isDeepStrictEqual } from 'node:util';
 import { isMap, isScalar, isSeq } from 'yaml';
@@ -103,7 +104,7 @@ function definition(data: unknown, file: string): PlanDefinition {
 }
 
 function address(path: string, length: number, file: string): string[] {
-  const parts = path.split('/');
+  const parts = pathParts(path);
   if (parts.length !== length || parts.some(part => !part || part === '*')) {
     fail('PATH_INVALID', file, path, length === 3 ? 'Expected table/key/column.' : 'Expected table/key.');
   }
@@ -121,13 +122,16 @@ function patch(data: unknown, file: string, stored: boolean): VariantInput {
     fail('VARIANT_SHAPE', file, '', 'Expected set cells, add rows, remove paths and optional sources. Cell values must be strings, booleans or null.');
   }
   const input = data as VariantInput;
+  for (const path of [...Object.keys(input.set ?? {}), ...Object.keys(input.add ?? {}), ...(input.remove ?? []), ...Object.keys(input.documents ?? {})]) {
+    if (canonicalPath(path) !== path) fail('PATH_INVALID', file, path, 'Use the canonical address: ' + canonicalPath(path));
+  }
   const rows = new Map<string, string>();
   for (const [operation, paths, length] of [
     ['set', Object.keys(input.set ?? {}), 3], ['add', Object.keys(input.add ?? {}), 2], ['remove', input.remove ?? [], 2],
   ] as const) {
     for (const path of paths) {
       const parts = address(path, length, file);
-      const row = parts.slice(0, 2).join('/');
+      const row = pathFromParts(parts.slice(0, 2));
       const previous = rows.get(row);
       if (previous && (previous !== 'set' || operation !== 'set')) {
         fail('VARIANT_CONFLICT', file, path, 'A row cannot combine add, remove and set operations or repeat a removal.');
@@ -160,7 +164,7 @@ function variantAt(project: Project, plan: string, name: string): Variant {
     const captured = Object.hasOwn(record.base_values, path);
     const value = record.base_values[path];
     if (!paths.has(path) || captured === missing.has(path) ||
-        (captured && !(path.split('/').length === 3 ? cell(value) : isRecord(value)))) {
+        (captured && !(pathParts(path).length === 3 ? cell(value) : isRecord(value)))) {
       fail('VARIANT_SHAPE', file, path, 'Each patch path needs exactly one original base value or base_missing entry.');
     }
   }
@@ -196,7 +200,7 @@ function baseline(project: Project): Project {
 type Contexts = ReturnType<typeof tableContexts>;
 
 function valueAt(contexts: Contexts, path: string): PlanValue {
-  const [table, key, column] = path.split('/');
+  const [table, key, column] = pathParts(path);
   const context = contexts.get(table!);
   if (!context) return absent();
   const rows = context.table.rows.filter(row => row[context.schema.primary_key] === key);
@@ -211,7 +215,7 @@ function changesFor(project: Project, input: VariantInput, file: string): Map<st
   const operations: EditOperation[] = [];
   const updates = new Map<string, Record<string, Cell>>();
   for (const path of touched(input)) {
-    const [table, key, column] = path.split('/');
+    const [table, key, column] = pathParts(path);
     const context = contexts.get(table!);
     if (!context) fail('PATH_NOT_FOUND', file, path, 'Unknown table or invalid schema: ' + table);
     if (column !== undefined) {
@@ -224,14 +228,14 @@ function changesFor(project: Project, input: VariantInput, file: string): Map<st
       if (Object.hasOwn(fields, context.schema.primary_key)) fail('RENAME_REQUIRED', file, path, 'The added Key comes from its row path; omit the Key field.');
       if (rows.length) fail('NAME_EXISTS', file, path, 'The added row already exists.');
       for (const field of Object.keys(fields)) {
-        if (!Object.hasOwn(context.schema.columns, field)) fail('COLUMN_UNKNOWN', file, path + '/' + field, 'Unknown column: ' + field);
+        if (!Object.hasOwn(context.schema.columns, field)) fail('COLUMN_UNKNOWN', file, appendPath(path, field), 'Unknown column: ' + field);
       }
       operations.push({ op: 'create', table: table!, row: { [context.schema.primary_key]: key!, ...fields } });
     } else {
-      if (rows.length !== 1) fail('PATH_NOT_FOUND', file, path, 'Row Key is missing or ambiguous: ' + table + '/' + key);
+      if (rows.length !== 1) fail('PATH_NOT_FOUND', file, path, 'Row Key is missing or ambiguous: ' + pathFromParts([table!, key!]));
       if (column === undefined) operations.push({ op: 'delete', table: table!, key: key! });
       else {
-        const rowPath = table + '/' + key;
+        const rowPath = pathFromParts([table!, key!]);
         const values = updates.get(rowPath) ?? Object.create(null) as Record<string, Cell>;
         values[column] = input.set![path]!;
         updates.set(rowPath, values);
@@ -239,7 +243,7 @@ function changesFor(project: Project, input: VariantInput, file: string): Map<st
     }
   }
   for (const [path, values] of updates) {
-    const [table, key] = path.split('/');
+    const [table, key] = pathParts(path);
     operations.push({ op: 'update', table: table!, key: key!, values });
   }
   const changes = operations.length ? prepareEdits(project, operations) : new Map<string, string>();
@@ -308,16 +312,16 @@ export function getPlan(project: Project, name: string): PlanView {
   for (const input of Object.values(variants)) {
     for (const path of Object.keys(input.set ?? {})) paths.add(path);
     for (const path of [...Object.keys(input.add ?? {}), ...(input.remove ?? [])]) {
-      const context = contexts.get(path.split('/')[0]!);
+      const context = contexts.get(pathParts(path)[0]!);
       const captured = input.base_values[path];
       const fields = new Set([...Object.keys(context?.schema.columns ?? {}), ...Object.keys(input.add?.[path] ?? {}),
         ...(isRecord(captured) ? Object.keys(captured) : [])]);
-      for (const field of fields) paths.add(path + '/' + field);
+      for (const field of fields) paths.add(appendPath(path, field));
     }
   }
   const comparison = sorted(paths).map(path => {
-    const [table, key, column] = path.split('/');
-    const rowPath = table + '/' + key;
+    const [table, key, column] = pathParts(path);
+    const rowPath = pathFromParts([table!, key!]);
     const current = valueAt(contexts, path);
     const alternatives = Object.fromEntries(Object.entries(variants).map(([name, input]) => {
       let value = current;

@@ -1,3 +1,4 @@
+import { pathParts, pathFromParts } from './paths.js';
 import { resourceEntries, resourceFile } from './resources.js';
 import { toString } from 'mdast-util-to-string';
 import type { Project, RenameKind, Usage, Usages } from './types.js';
@@ -11,14 +12,16 @@ export function documentSources(project: Project): [string, string, string][] {
 }
 
 export function documentPathMatches(destination: string, target: string, wildcard = false): boolean {
-  const parts = destination.split('/'), wanted = target.split('/');
-  return parts.length >= wanted.length && wanted.every((part, index) => part === parts[index] || wildcard && index === 1 && part === '*');
+  try {
+    const parts = pathParts(destination), wanted = pathParts(target);
+    return parts.length >= wanted.length && wanted.every((part, index) => part === parts[index] || wildcard && index === 1 && part === '*');
+  } catch { return false; }
 }
 
 export function documentUsages(project: Project, path: string): Usages {
   const result: Usages = { references: [], candidates: [] };
-  const needle = path.split('/').at(-1)!;
-  const wildcard = resourceFile(project, 'table', path.split('/')[0]!) !== undefined;
+  const needle = pathParts(path).at(-1)!;
+  const wildcard = resourceFile(project, 'table', pathParts(path)[0]!) !== undefined;
   for (const [name, file, source] of documentSources(project)) {
     const document = parseMarkdown(name, source);
     function add(list: Usage[], offset: number, location = name): void {
@@ -82,12 +85,12 @@ export function rewriteMarkdownPaths(name: string, source: string, rename: (path
     if (link.kind !== 'resource' || link.path === undefined) continue;
     const next = rename(link.path);
     if (next === link.path) continue;
-    const oldParts = link.path.split('/'), newParts = next.split('/');
+    const oldParts = pathParts(link.path), newParts = pathParts(next);
     const raw = source.slice(link.start, link.end), ranges = destinationSegments(raw);
     const angle = source[link.start - 1] === '<';
-    if (oldParts.length !== newParts.length || ranges.length !== oldParts.length) {
+    if (link.path.startsWith('./') || next.startsWith('./') || oldParts.length !== newParts.length || ranges.length !== oldParts.length) {
       edits.set(link.start + ':' + link.end, { start: link.start, end: link.end,
-        text: newParts.map(part => encodeSegment(part, angle)).join('/') });
+        text: pathFromParts(newParts).split('/').map(part => encodeSegment(part, angle)).join('/') });
     } else for (let i = 0; i < oldParts.length; i++) {
       if (oldParts[i] === newParts[i]) continue;
       const start = link.start + ranges[i]!.start, end = link.start + ranges[i]!.end;
@@ -103,16 +106,16 @@ export function rewriteMarkdownPaths(name: string, source: string, rename: (path
 
 export function renameDocumentLinks(project: Project, kind: RenameKind, path: string, to: string): Map<string, string> {
   if (kind === 'schema') return new Map();
-  const [name, key, column] = path.split('/');
+  const [name, key, column] = pathParts(path);
   const contexts = kind === 'column' ? tableContexts(project) : undefined;
   const schema = contexts?.get(name!)?.table.schema;
   const shared = new Set(contexts ? [...contexts].filter(([, item]) => item.table.schema === schema).map(([table]) => table) : []);
   return rewriteDocumentPaths(project, destination => {
-    const parts = destination.split('/');
+    const parts = pathParts(destination);
     if ((kind === 'table' || kind === 'document') && parts[0] === name) parts[0] = to;
     if (kind === 'key' && parts[0] === name && parts[1] === key) parts[1] = to;
     if (kind === 'column' && shared.has(parts[0]!) && parts[2] === column) parts[2] = to;
-    if ((kind === 'heading' || kind === 'tag') && documentPathMatches(destination, path)) parts[path.split('/').length - 1] = to;
-    return parts.join('/');
+    if ((kind === 'heading' || kind === 'tag') && documentPathMatches(destination, path)) parts[pathParts(path).length - 1] = to;
+    return pathFromParts(parts);
   });
 }

@@ -1,3 +1,4 @@
+import { pathParts, pathContains, canonicalPath } from './paths.js';
 import type { Project } from './types.js';
 import { VibeError } from './types.js';
 import { resourceFile } from './resources.js';
@@ -10,7 +11,8 @@ export interface DocumentScope {
 }
 /** Offsets are ephemeral, at the caller's revision. Only public paths are persisted. */
 export function documentScope(project: Project, path: string): DocumentScope {
-  const parts = path.split('/'), name = parts[0]!;
+  path = canonicalPath(path);
+  const parts = pathParts(path), name = parts[0]!;
   if (parts.some(part => !part || part === '*')) throw new VibeError('PATH_INVALID', 'Expected a document, heading or named paragraph path.');
   const file = resourceFile(project, 'document', name), source = file && project.sources.get(file);
   if (!file || source === undefined) throw new VibeError('PATH_NOT_FOUND', 'Unknown document: ' + name);
@@ -23,7 +25,7 @@ export function documentScope(project: Project, path: string): DocumentScope {
   if (parts.length > 1) {
     const blocks = parsed.blocks.filter(block => block.path === path);
     if (blocks.length !== 1 || parsed.diagnostics.some(d => ['DOCUMENT_PATH_DUPLICATE', 'DOCUMENT_NAME_INVALID'].includes(d.code)
-      && (path === d.path || path.startsWith(d.path + '/')))) throw new VibeError('PATH_NOT_FOUND', 'Missing or ambiguous document scope: ' + path);
+      && pathContains(d.path, path))) throw new VibeError('PATH_NOT_FOUND', 'Missing or ambiguous document scope: ' + path);
     const block = blocks[0]!;
     start = block.start; end = block.end;
     if (block.kind === 'heading') {
@@ -54,7 +56,7 @@ export function documentVariantChanges(project: Project, replacements: Record<st
   for (const [path, markdown] of Object.entries(replacements)) {
     checkMarkdownSource(markdown);
     const scope = documentScope(project, path), entries = groups.get(scope.file) ?? [];
-    if (entries.some(entry => scope.path.startsWith(entry.scope.path + '/') || entry.scope.path.startsWith(scope.path + '/')
+    if (entries.some(entry => pathContains(entry.scope.path, scope.path) || pathContains(scope.path, entry.scope.path)
       || scope.start < entry.scope.end && entry.scope.start < scope.end)) throw new VibeError('EDIT_OVERLAP', 'Document variant scopes overlap: ' + path);
     entries.push({ scope, markdown }); groups.set(scope.file, entries);
   }

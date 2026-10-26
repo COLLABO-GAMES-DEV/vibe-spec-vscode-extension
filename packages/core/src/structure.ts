@@ -1,3 +1,4 @@
+import { newFolderMarkers } from './folder-names.js';
 import { resourceEntries, resourceEntry, resourceFile, resourcePath } from './resources.js';
 import { Ajv } from 'ajv';
 import { isMap, isScalar, isSeq } from 'yaml';
@@ -70,7 +71,8 @@ async function prepare(project: Project, operation: StructureOperation) {
       const error = tableNameError(operation.table, tableNames);
       if (error) throw new VibeError(resourceNameError(operation.table) ? 'NAME_INVALID' : 'NAME_EXISTS', error);
       if (!validColumnCode(operation.key.code)) throw new VibeError('INVALID_COLUMN_CODE', 'New column codes must contain only lowercase English letters, digits and _.');
-      const tablePath = resourcePath('table', operation.table, operation.folder);
+      const tablePath = resourcePath('table', operation.table, operation.folder, project);
+      for (const [file, text] of newFolderMarkers(project, operation.folder ?? '')) changes.set(file, text);
       const schemaNames = resourceEntries(project, 'schema').map(entry => entry.name);
       const occupied = new Set(schemaNames.map(resourceNameKey));
       let schemaName = operation.table;

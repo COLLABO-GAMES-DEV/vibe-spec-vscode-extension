@@ -43,3 +43,5 @@ export { documentScope, documentScopes, documentVariantChanges } from './documen
 export type { DocumentScope } from './document-variants.js';
 export { getTargetDocumentView, saveTargetDocumentSnapshots, editVariantDocument } from './document-targets.js';
 export type { TargetDocumentView, TargetDocumentSnapshot } from './document-targets.js';
+export { pathParts, pathFromParts, appendPath, pathContains, canonicalPath } from './paths.js';
+export { folderNameError, folderAddress, folderStorage } from './folder-names.js';

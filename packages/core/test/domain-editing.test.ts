@@ -161,12 +161,12 @@ it('creates resources in a folder, keeps new schemas at root and rejects global 
 
 it('lists and diagnoses ambiguous nested documents while refusing reads', async () => {
   const project = await fixture({
-    'documents/elsewhere/GUIDE.md': '# Bad/name\n\n[missing](absent)',
+    'documents/elsewhere/GUIDE.md': '# Duplicate\n\n# Duplicate\n\n[missing](absent)',
     'documents/elsewhere/items.md': '# Table collision',
   });
   expect(() => documentDiagnostics(project)).not.toThrow();
   expect(documentDiagnostics(project)).toContainEqual(expect.objectContaining({
-    code: 'DOCUMENT_NAME_INVALID', file: 'documents/elsewhere/GUIDE.md',
+    code: 'DOCUMENT_PATH_DUPLICATE', file: 'documents/elsewhere/GUIDE.md',
   }));
   expect(listDocuments(project)).toEqual(expect.arrayContaining([
     expect.objectContaining({ name: 'guide', errors: expect.any(Number) }),

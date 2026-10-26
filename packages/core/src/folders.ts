@@ -1,3 +1,5 @@
+import { folderStorage, folderMarkers, physicalFolders } from './folder-names.js';
+import { pathParts, pathFromParts } from './paths.js';
 import { lstat, readdir } from 'node:fs/promises';
 import { join, posix } from 'node:path';
 import type { FolderOperation } from './folder-types.js';
@@ -16,7 +18,7 @@ function ancestors(folder: string): string[] {
   return folder ? folder.split('/').map((_, index, parts) => parts.slice(0, index + 1).join('/')) : [];
 }
 function requireFolder(project: Project, folder: string): void {
-  if (folder && !listFolders(project).includes(folder)) throw new VibeError('FOLDER_NOT_FOUND', 'Unknown domain folder: ' + folder);
+  if (folder && !physicalFolders(project).includes(folder)) throw new VibeError('FOLDER_NOT_FOUND', 'Unknown domain folder: ' + folder);
 }
 
 // Check both physical roots, including entries not included in the project snapshot.
@@ -58,9 +60,37 @@ export async function applyFolderEdit(
   if (!operation || !['folder-create', 'folder-rename', 'folder-move', 'folder-delete', 'resource-move'].includes(operation.op)) {
     throw new VibeError('OPERATION_INVALID', 'Unknown folder operation.');
   }
+  const requested = operation;
   const cleanupDirectories: string[] = [];
   return mutateProject(root, expectedRevision, async project => {
+    let operation = requested;
+    let markerAddress: string | undefined;
+    if (requested.op === 'resource-move') {
+      validFolder(requested.folder, true);
+      markerAddress = requested.folder;
+      operation = { ...requested, folder: folderStorage(project, requested.folder) };
+    } else {
+      validFolder(requested.path);
+      const path = folderStorage(project, requested.path);
+      if (requested.op === 'folder-create') { markerAddress = requested.path; operation = { ...requested, path }; }
+      else if (requested.op === 'folder-rename') {
+        markerAddress = pathFromParts([...pathParts(requested.path).slice(0, -1), requested.name]);
+        validFolder(markerAddress);
+        operation = { ...requested, path, name: posix.basename(folderStorage(project, markerAddress)) };
+      } else if (requested.op === 'folder-move') {
+        validFolder(requested.folder, true);
+        markerAddress = pathFromParts([...(requested.folder ? pathParts(requested.folder) : []), pathParts(requested.path).at(-1)!]);
+        // Existing move logic preserves the physical basename; choose the destination spelling explicitly below.
+        operation = { ...requested, path, folder: folderStorage(project, requested.folder) };
+      } else operation = { ...requested, path };
+    }
     const changes = new Map<string, string | null>();
+    const markers = (storage: string, replaceLeaf = false) => {
+      if (!markerAddress) return;
+      for (const [file, value] of folderMarkers(markerAddress, storage)) {
+        if (replaceLeaf && file === 'tables/' + storage + '/.gitkeep' || replaceLeaf && file === 'documents/' + storage + '/.gitkeep' || !project.sources.has(file)) changes.set(file, value);
+      }
+    };
     if (operation.op === 'resource-move') {
       if (operation.kind !== 'table' && operation.kind !== 'document') throw new VibeError('OPERATION_INVALID', 'Only tables and documents can move between domains.');
       validFolder(operation.folder, true);
@@ -80,6 +110,7 @@ export async function applyFolderEdit(
       changes.set(destination, project.sources.get(source)!);
       changes.set(source, null);
       preserveFolders(project, changes, [resourceEntry(source)!.folder, operation.folder]);
+      markers(operation.folder);
       return changes;
     }
 
@@ -87,6 +118,7 @@ export async function applyFolderEdit(
     if (operation.op === 'folder-create') {
       await checkDestination(project, operation.path, true);
       preserveFolders(project, changes, [operation.path]);
+      markers(operation.path);
       return changes;
     }
     requireFolder(project, operation.path);
@@ -100,7 +132,7 @@ export async function applyFolderEdit(
     } else if (operation.op === 'folder-move') {
       validFolder(operation.folder, true);
       requireFolder(project, operation.folder);
-      destination = (operation.folder ? operation.folder + '/' : '') + posix.basename(operation.path);
+      destination = folderStorage(project, markerAddress!);
     }
     if (destination !== undefined) {
       validFolder(destination);
@@ -143,6 +175,7 @@ export async function applyFolderEdit(
     for (const side of roots) await scan(side + '/' + operation.path, destination === undefined ? undefined : side + '/' + destination);
     const parent = posix.dirname(operation.path);
     preserveFolders(project, changes, [...movedFolders, ...(parent === '.' ? [] : [parent])]);
+    if (destination) markers(destination, true);
     return changes;
   }, { ...options, cleanupDirectories });
 }

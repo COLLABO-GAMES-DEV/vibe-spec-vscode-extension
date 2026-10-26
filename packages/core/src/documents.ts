@@ -1,3 +1,5 @@
+import { newFolderMarkers } from './folder-names.js';
+import { pathParts, pathFromParts, canonicalPath } from './paths.js';
 import { renamePlanReferences } from './plan-references.js';
 import { resourceEntries, resourceEntry, resourceFile, resourcePath } from './resources.js';
 import type { Heading } from 'mdast';
@@ -27,7 +29,7 @@ function document(project: Project, name: string): ParsedDocument {
   return parseDocument(name, source, fileOf(project, name));
 }
 function addressable(parsed: ParsedDocument, path: string): boolean {
-  const ancestors = path.split('/').map((_, i, parts) => parts.slice(0, i + 1).join('/'));
+  const ancestors = pathParts(path).map((_, i, parts) => pathFromParts(parts.slice(0, i + 1)));
   return !parsed.diagnostics.some(item =>
     ['DOCUMENT_PATH_DUPLICATE', 'DOCUMENT_NAME_INVALID'].includes(item.code) && ancestors.includes(item.path));
 }
@@ -41,8 +43,9 @@ function namedBlock(parsed: ParsedDocument, path: string): DocumentBlock {
 
 /** Reading a section does not resolve its links, including self/cyclic links. */
 export function readDocumentPath(project: Project, path: string): unknown {
-  if (typeof path !== 'string' || path.split('/').some(part => !part)) throw new VibeError('PATH_INVALID', 'Invalid document path.');
-  const name = path.split('/')[0]!, parsed = document(project, name);
+  path = canonicalPath(path);
+  if (typeof path !== 'string' || pathParts(path).some(part => !part)) throw new VibeError('PATH_INVALID', 'Invalid document path.');
+  const name = pathParts(path)[0]!, parsed = document(project, name);
   if (path === name) return parsed.source;
   const block = namedBlock(parsed, path);
   const tree = markdownTree(parsed.source);
@@ -125,7 +128,7 @@ export async function createDocument(
   checkSource(source);
   return mutateProject(root, revision, before => {
     checkName(before, name);
-    return new Map([[resourcePath('document', name, options.folder), source]]);
+    return new Map([...newFolderMarkers(before, options.folder ?? ''), [resourcePath('document', name, options.folder, before), source]]);
   }, options);
 }
 
@@ -144,8 +147,8 @@ function headingAt(parsed: ParsedDocument, block: DocumentBlock): Heading | unde
   return markdownTree(parsed.source).children.find((node): node is Heading => node.type === 'heading' && nodeStart(node) === block.start);
 }
 function checkSegment(to: string, kind: 'heading' | 'tag'): void {
-  if (typeof to !== 'string' || !to.trim() || /[/\r\n\u0000]/.test(to) || to.trim() !== to || kind === 'tag' && to.includes('-->')) {
-    throw new VibeError('NAME_INVALID', 'Heading and tag names must be nonempty, have no surrounding whitespace, /, or line breaks.');
+  if (typeof to !== 'string' || !to.trim() || /[\r\n\u0000]/.test(to) || to.trim() !== to || kind === 'tag' && to.includes('-->')) {
+    throw new VibeError('NAME_INVALID', 'Heading and tag names must be nonempty, have no surrounding whitespace or line breaks.');
   }
   checkSource(to);
 }
@@ -179,9 +182,9 @@ function replacementRename(parsed: ParsedDocument, block: DocumentBlock, markdow
   if (next.blocks.length === 1 && nextBlock?.path && addressable(next, nextBlock.path) &&
       (oldHeading && newHeading && oldHeading.depth === newHeading.depth ||
        !oldHeading && !newHeading && nameComment.test(markdown.split(/\r\n|\r|\n/)[0]!))) {
-    const to = nextBlock.path.split('/').at(-1)!;
+    const to = pathParts(nextBlock.path).at(-1)!;
     checkSegment(to, oldHeading ? 'heading' : 'tag');
-    const nextPath = block.path.slice(0, block.path.lastIndexOf('/') + 1) + to;
+    const nextPath = pathFromParts([...pathParts(block.path).slice(0, -1), to]);
     assertFreePath(parsed, block.path, nextPath);
     if (nextPath !== block.path) return { path: block.path, to, kind: oldHeading ? 'heading' : 'tag' };
   }
@@ -189,9 +192,9 @@ function replacementRename(parsed: ParsedDocument, block: DocumentBlock, markdow
 
 function documentRenamePath(renamed: DocumentRename[]): (path: string) => string {
   return path => {
-    const parts = path.split('/');
-    for (const rename of renamed) if (documentPathMatches(path, rename.path)) parts[rename.path.split('/').length - 1] = rename.to;
-    return parts.join('/');
+    const parts = pathParts(path);
+    for (const rename of renamed) if (documentPathMatches(path, rename.path)) parts[pathParts(rename.path).length - 1] = rename.to;
+    return pathFromParts(parts);
   };
 }
 
@@ -354,9 +357,10 @@ export async function renameDocument(
   if (!['document', 'heading', 'tag'].includes(kind) || typeof path !== 'string' || typeof to !== 'string') {
     throw new VibeError('INVALID_ARGUMENT', 'Expected document, heading or tag rename.');
   }
+  path = canonicalPath(path);
   let candidates: WriteResult['candidates'] = [];
   const result = await mutateProject(root, revision, async before => {
-    const name = path.split('/')[0]!, parsed = document(before, name);
+    const name = pathParts(path)[0]!, parsed = document(before, name);
     const changes = new Map<string, string | null>();
     if (kind === 'document') {
       if (path !== name) throw new VibeError('PATH_INVALID', 'Document rename expects a document name.');
@@ -376,8 +380,8 @@ export async function renameDocument(
     if (kind === 'heading' ? !heading : !!heading || !nameComment.test(block.markdown.split(/\r\n|\r|\n/)[0]!)) {
       throw new VibeError('PATH_INVALID', 'The path does not identify a ' + kind + '.');
     }
-    if (path.split('/').at(-1) === to) return changes;
-    const nextPath = path.slice(0, path.lastIndexOf('/') + 1) + to;
+    if (pathParts(path).at(-1) === to) return changes;
+    const nextPath = pathFromParts([...pathParts(path).slice(0, -1), to]);
     assertFreePath(parsed, path, nextPath);
     let edit: Splice;
     if (heading) {
@@ -388,7 +392,7 @@ export async function renameDocument(
       const old = nameComment.exec(comment)![1]!;
       edit = { start: block.start + prefix.length, end: block.start + prefix.length + old.length, text: to };
     }
-    candidates = await textCandidates(before, path.split('/').at(-1)!);
+    candidates = await textCandidates(before, pathParts(path).at(-1)!);
     const source = spliceSource(parsed.source, [edit]);
     changes.set(fileOf(before, name), source);
     for (const [file, value] of renameDocumentLinks(withSource(before, name, source), kind, path, to)) changes.set(file, value);

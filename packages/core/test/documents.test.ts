@@ -49,7 +49,7 @@ describe('Markdown source model', () => {
     const parsed = parseMarkdown('guide', '# **경제**\n\n### `획득`\n\n<!-- name: 지급 -->\n설명\n\n## 소비\n\n# 기타');
     expect(parsed.blocks.map(block => block.path)).toEqual(['guide/경제', 'guide/경제/획득', 'guide/경제/획득/지급', 'guide/경제/소비', 'guide/기타']);
     const invalid = parseMarkdown('guide', '# A\n\n## B\n\n<!-- name: B -->\ntext\n\n## B\n\n# bad/name\n\n<!-- name: dangling -->');
-    expect(invalid.diagnostics.map(item => item.code)).toEqual(expect.arrayContaining(['DOCUMENT_PATH_DUPLICATE', 'DOCUMENT_NAME_INVALID', 'DOCUMENT_TAG_ORPHAN']));
+    expect(invalid.diagnostics.map(item => item.code)).toEqual(expect.arrayContaining(['DOCUMENT_PATH_DUPLICATE', 'DOCUMENT_TAG_ORPHAN']));
     expect(parseMarkdown('guide', 'First\r\nsecond\r\n=====').blocks[0]!.path).toBe('guide/First second');
     const doubleBom = '\uFEFF\uFEFFcontent';
     const block = parseMarkdown('guide', doubleBom).blocks[0]!;
@@ -125,14 +125,15 @@ describe('document reading and diagnostics', () => {
     expect(() => readDocumentPath(p, 'guide/Private')).toThrow();
   });
 
-  it('rejects duplicate/slash heading paths and their descendants while retaining whole source access', async () => {
+  it('rejects duplicate headings while slash headings use explicit escaped addresses', async () => {
     const source = '# bad/name\n\n## child\n\n# same\n\n## child\n\n# same';
     const p = await project({ 'documents/guide.md': source });
     for (const path of ['guide/bad/name', 'guide/bad/name/child', 'guide/same', 'guide/same/child']) {
       expect(() => readDocumentPath(p, path)).toThrow();
     }
     expect(readDocumentPath(p, 'guide')).toBe(source);
-    expect(listDocuments(p)[0]!.errors).toBe(2);
+    expect(readDocumentPath(p, './guide/bad~1name/child')).toContain('## child');
+    expect(listDocuments(p)[0]!.errors).toBe(1);
   });
 
   it('reports broken resources, missing images, traversal and remote image limitations', async () => {

@@ -113,7 +113,7 @@ suite('vibe-spec documents in native VS Code', function () {
   test('sidebar reports document errors and opens its command with scoped Webview resources', async () => {
     const source = '\uFEFF# 재화\r\n\r\n메모  \r\n\r\n끝';
     await externalDocument('경제 # %', source);
-    await externalDocument('확인 필요', '# 잘못/제목\n\n[끊김](없는문서/제목)');
+    await externalDocument('확인 필요', '# 중복\n\n# 중복\n\n[끊김](없는문서/제목)');
     const entries = await items(api);
     assert.deepEqual(entries.map(label).sort(), ['경제 # %', '확인 필요'].sort());
     const valid = entries.find(item => label(item) === '경제 # %')!;

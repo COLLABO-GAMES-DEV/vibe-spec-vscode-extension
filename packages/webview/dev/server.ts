@@ -1,3 +1,4 @@
+import { pathParts, pathFromParts } from '@vibe-spec/core/paths';
 import { createDocumentsServer } from './documentsServer.js';
 import { cp, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -97,7 +98,7 @@ export function fakeHostServer(): Plugin {
               response.end(JSON.stringify({ type: 'structurePreview', preview })); return;
             }
             if (body.type === 'whereUsed') {
-              const result = await whereUsed(project, table + '/' + String(body.key));
+              const result = await whereUsed(project, pathFromParts([table, String(body.key)]));
               usageResults.set(screen, result);
               response.end(JSON.stringify({ type: 'usages', key: body.key, result })); return;
             }
@@ -107,7 +108,7 @@ export function fakeHostServer(): Plugin {
             } else {
               const usage = usageResults.get(screen)?.[body.kind as keyof Usages]?.[Number(body.index)];
               if (!usage) throw new Error('Unknown usage result.');
-              const [name, key, column] = usage.path.split('/');
+              const [name, key, column] = pathParts(usage.path);
               if (usage.file.startsWith('tables/') && name && key && column) target = { table: name, key, column };
               else { response.end(JSON.stringify({ type: 'notice', message: usage.file + ':' + usage.line })); return; }
             }
@@ -121,7 +122,7 @@ export function fakeHostServer(): Plugin {
             } else if (body.type === 'columnRename') {
               result = await renameResource(root, String(body.revision), 'column', table + '/*/' + String(body.column), String(body.to)); history.recordStructure(result);
             } else if (body.type === 'rename') {
-              result = await renameResource(root, String(body.revision), 'key', table + '/' + String(body.key), String(body.to));
+              result = await renameResource(root, String(body.revision), 'key', pathFromParts([table, String(body.key)]), String(body.to));
               history.recordRename(result, table, String(body.key), String(body.to));
             } else {
               assertCompleteCellInputs(project, body.operations as EditOperation[]);

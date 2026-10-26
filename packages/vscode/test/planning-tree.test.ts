@@ -7,7 +7,7 @@ import { cp, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/pr
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import * as vscode from 'vscode';
-import { validateProject, type Project, type WriteResult } from '@vibe-spec/core';
+import { createDocument, renameResource, pathFromParts, validateProject, type Project, type WriteResult } from '@vibe-spec/core';
 import type { PlanningItem, PlanningTree } from '../src/planningTree.js';
 import { watchProject } from '../src/projectWatcher.js';
 
@@ -85,10 +85,31 @@ suite('vibe-spec unified planning tree in native VS Code', function () {
     await eventually(() => api.getProject()?.sources.has('documents/경제/상점/안내.md') === true, 'Nested mixed files were not watched.');
   }
 
+  test('shows raw slash folder names and opens escaped document scopes without changing Markdown', async () => {
+    await command('newFolder', { path: '분류~1보상' });
+    await command('newFolder', { name: '분류/보상', folder: '' });
+    const slash = children().find(item => label(item) === '분류/보상');
+    assert.ok(slash); assert.ok(children().some(item => label(item) === '분류~1보상'));
+    const source = '\uFEFF# 공격 / 방어\r\n\r\n<!-- name: 기본/값~1 -->\r\n내용  ';
+    await createDocument(root, api.getProject()!.revision, 'guide', source, { folder: './분류~1보상' });
+    await api.refresh();
+    const entry = children(slash).find(item => label(item) === 'guide'); assert.ok(entry);
+    const path = pathFromParts(['guide', '공격 / 방어', '기본/값~1']);
+    const panel = await vscode.commands.executeCommand<vscode.WebviewPanel>('vibe.openDocument', 'guide', path);
+    assert.equal(panel.title, 'guide');
+    const transport = observe(panel);
+    await eventually(() => transport.messages.some(message => message.type === 'documentsState' && message.view?.name === 'guide'), 'Escaped scope did not reach the Webview.');
+    assert.equal(validateProject(api.getProject()!).length, 0);
+    assert.equal([...api.getProject()!.sources].find(([file]) => file.endsWith('/guide.md'))?.[1], source);
+    transport.dispose(); panel.dispose();
+    await command('renameFolder', { path: './분류~1보상', name: '새/분류' });
+    assert.ok(children().some(item => label(item) === '새/분류'));
+  });
+
   test('one contributed tree merges physical folders and preserves resource icons, commands and errors', async () => {
     await mixed();
     await mkdir(join(root, 'documents', '빈 폴더'), { recursive: true });
-    await writeFile(join(root, 'documents', '경제', '상점', '오류 문서.md'), '# 잘못/제목');
+    await writeFile(join(root, 'documents', '경제', '상점', '오류 문서.md'), '# 중복\n\n# 중복');
     // A recursive load can see the new file after it enumerated the parent folders.
     await eventually(() => api.getProject()?.sources.has('documents/경제/상점/오류 문서.md') === true
       && api.getProject()?.directories?.includes('documents/빈 폴더') === true
@@ -185,7 +206,7 @@ suite('vibe-spec unified planning tree in native VS Code', function () {
       await command('newResource', { name: '선택 유지' });
       assert.ok(folder('경제/상점/선택 유지'));
       assert.equal(children(folder('다른 위치')).length, 0);
-      assert.deepEqual(optionsSeen.map(options => options.placeHolder), ['만들 위치: 최상위 (루트)', '만들 위치: 경제/상점']);
+      assert.deepEqual(optionsSeen.map(options => options.placeHolder), ['만들 위치: 최상위 (루트)', '만들 위치: 경제 › 상점']);
     } finally { picker.mock.restore(); }
   });
 

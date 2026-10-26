@@ -1,3 +1,4 @@
+import { pathParts, pathFromParts } from './paths.js';
 import { resourceEntry, resourceFile } from './resources.js';
 import { documentUsages } from './document-references.js';
 import { readFile, readdir } from 'node:fs/promises';
@@ -25,7 +26,7 @@ export async function textCandidates(project: Project, needle: string): Promise<
         if (typeof value !== 'string') continue;
         const definition = item.schema.columns[field];
         const node = item.file.document.getIn(['rows', i, field], true) as { range?: number[] } | undefined;
-        const location = name + '/' + String(row[item.schema.primary_key]) + '/' + field;
+        const location = pathFromParts([name, String(row[item.schema.primary_key]), field]);
         if (field !== item.schema.primary_key && definition?.type !== 'ref' && value.includes(needle)) {
           add(candidates, item.file.file, location, item.file.source, node?.range?.[0] ?? 0);
         }
@@ -58,10 +59,10 @@ export async function deletionUsages(project: Project, diagnostics: readonly Dia
   for (const diagnostic of diagnostics) {
     if (diagnostic.code !== 'DELETE_RESTRICTED') continue;
     if (diagnostic.target) { targets.add(diagnostic.target); continue; }
-    const [table, key, column] = diagnostic.path.split('/');
+    const [table, key, column] = pathParts(diagnostic.path);
     const context = contexts.get(table!), definition = context?.schema.columns[column!];
     const row = context?.table.rows.find(row => row[context.schema.primary_key] === key);
-    if (definition?.type === 'ref' && typeof row?.[column!] === 'string') targets.add(definition.table + '/' + row[column!]);
+    if (definition?.type === 'ref' && typeof row?.[column!] === 'string') targets.add(pathFromParts([definition.table!, row[column!] as string]));
   }
   const result: Usages = { references: [], candidates: [] };
   for (const target of targets) {
@@ -74,20 +75,20 @@ export async function deletionUsages(project: Project, diagnostics: readonly Dia
 export async function whereUsed(project: Project, path: string): Promise<Usages> {
   try { readPath(project, path); }
   catch (error) {
-    const parts = path.split('/');
+    const parts = pathParts(path);
     if (!(error instanceof VibeError) || error.code !== 'PATH_NOT_FOUND' || parts.length < 2 ||
-        !hasPlanAddedRow(project, parts.slice(0, 2).join('/'))) throw error;
+        !hasPlanAddedRow(project, pathFromParts(parts.slice(0, 2)))) throw error;
     // Resolve table/column declarations even if the row exists only in an alternative.
     readPath(project, parts.length === 3 ? parts[0] + '/*/' + parts[2] : parts[0]!);
   }
-  if (resourceFile(project, 'document', path.split('/')[0]!) !== undefined) {
+  if (resourceFile(project, 'document', pathParts(path)[0]!) !== undefined) {
     const result = documentUsages(project, path), plans = planUsages(project, path);
     result.references.push(...plans.references);
-    result.candidates = [...(await textCandidates(project, path.split('/').at(-1)!)).filter(candidate =>
+    result.candidates = [...(await textCandidates(project, pathParts(path).at(-1)!)).filter(candidate =>
       resourceEntry(candidate.file)?.kind !== 'document' && !candidate.file.startsWith('plans/')), ...result.candidates, ...plans.candidates];
     return result;
   }
-  const [table, key, column] = path.split('/');
+  const [table, key, column] = pathParts(path);
   const needle = column ?? key ?? table!;
   const references: Usage[] = [];
   const candidates = await textCandidates(project, needle);
@@ -99,7 +100,7 @@ export async function whereUsed(project: Project, path: string): Promise<Usages>
         if (key !== undefined && row[reference.field] !== key) continue;
         const node = reference.file.document.getIn(['rows', i, reference.field], true) as { range?: number[] } | undefined;
         if (node) add(references, reference.file.file,
-          reference.name + '/' + String(row[reference.primaryKey] ?? '') + '/' + reference.field,
+          pathFromParts([reference.name, String(row[reference.primaryKey] ?? ''), reference.field]),
           reference.file.source, node.range?.[0] ?? 0);
       }
     }
