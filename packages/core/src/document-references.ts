@@ -70,30 +70,35 @@ function encodeSegment(value: string, angle: boolean): string {
 export function rewriteDocumentPaths(project: Project, rename: (path: string) => string): Map<string, string> {
   const changes = new Map<string, string>();
   for (const [name, file, source] of documentSources(project)) {
-    const edits = new Map<string, { start: number; end: number; text: string }>();
-    for (const link of parseMarkdown(name, source).links) {
-      if (link.kind !== 'resource' || link.path === undefined) continue;
-      const next = rename(link.path);
-      if (next === link.path) continue;
-      const oldParts = link.path.split('/'), newParts = next.split('/');
-      const raw = source.slice(link.start, link.end), ranges = destinationSegments(raw);
-      const angle = source[link.start - 1] === '<';
-      if (oldParts.length !== newParts.length || ranges.length !== oldParts.length) {
-        edits.set(link.start + ':' + link.end, { start: link.start, end: link.end,
-          text: newParts.map(part => encodeSegment(part, angle)).join('/') });
-      } else for (let i = 0; i < oldParts.length; i++) {
-        if (oldParts[i] === newParts[i]) continue;
-        const start = link.start + ranges[i]!.start, end = link.start + ranges[i]!.end;
-        edits.set(start + ':' + end, { start, end, text: encodeSegment(newParts[i]!, angle) });
-      }
-    }
-    let edited = source;
-    for (const edit of [...edits.values()].sort((a, b) => b.start - a.start)) {
-      edited = edited.slice(0, edit.start) + edit.text + edited.slice(edit.end);
-    }
+    const edited = rewriteMarkdownPaths(name, source, rename);
     if (edited !== source) changes.set(file, edited);
   }
   return changes;
+}
+
+export function rewriteMarkdownPaths(name: string, source: string, rename: (path: string) => string): string {
+  const edits = new Map<string, { start: number; end: number; text: string }>();
+  for (const link of parseMarkdown(name, source).links) {
+    if (link.kind !== 'resource' || link.path === undefined) continue;
+    const next = rename(link.path);
+    if (next === link.path) continue;
+    const oldParts = link.path.split('/'), newParts = next.split('/');
+    const raw = source.slice(link.start, link.end), ranges = destinationSegments(raw);
+    const angle = source[link.start - 1] === '<';
+    if (oldParts.length !== newParts.length || ranges.length !== oldParts.length) {
+      edits.set(link.start + ':' + link.end, { start: link.start, end: link.end,
+        text: newParts.map(part => encodeSegment(part, angle)).join('/') });
+    } else for (let i = 0; i < oldParts.length; i++) {
+      if (oldParts[i] === newParts[i]) continue;
+      const start = link.start + ranges[i]!.start, end = link.start + ranges[i]!.end;
+      edits.set(start + ':' + end, { start, end, text: encodeSegment(newParts[i]!, angle) });
+    }
+  }
+  let edited = source;
+  for (const edit of [...edits.values()].sort((a, b) => b.start - a.start)) {
+    edited = edited.slice(0, edit.start) + edit.text + edited.slice(edit.end);
+  }
+  return edited;
 }
 
 export function renameDocumentLinks(project: Project, kind: RenameKind, path: string, to: string): Map<string, string> {

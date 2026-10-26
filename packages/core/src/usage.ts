@@ -81,9 +81,10 @@ export async function whereUsed(project: Project, path: string): Promise<Usages>
     readPath(project, parts.length === 3 ? parts[0] + '/*/' + parts[2] : parts[0]!);
   }
   if (resourceFile(project, 'document', path.split('/')[0]!) !== undefined) {
-    const result = documentUsages(project, path);
+    const result = documentUsages(project, path), plans = planUsages(project, path);
+    result.references.push(...plans.references);
     result.candidates = [...(await textCandidates(project, path.split('/').at(-1)!)).filter(candidate =>
-      resourceEntry(candidate.file)?.kind !== 'document'), ...result.candidates];
+      resourceEntry(candidate.file)?.kind !== 'document' && !candidate.file.startsWith('plans/')), ...result.candidates, ...plans.candidates];
     return result;
   }
   const [table, key, column] = path.split('/');

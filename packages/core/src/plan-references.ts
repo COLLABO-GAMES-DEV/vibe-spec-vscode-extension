@@ -1,3 +1,6 @@
+import { documentPathMatches, rewriteMarkdownPaths } from './document-references.js';
+import { markdownTree, nodeStart, parseMarkdown, nameComment } from './document-parser.js';
+import { headingNameEdit } from './documents.js';
 import { isDeepStrictEqual } from 'node:util';
 import type { Project, RenameKind, Usage, Usages, YamlFile } from './types.js';
 import { isRecord, VibeError } from './types.js';
@@ -25,9 +28,10 @@ export function renamePlanReferences(project: Project, kind: RenameKind, path: s
   const shared = new Set([...contexts].filter(([, item]) => item.table.schema === target?.table.schema).map(([name]) => name));
   function address(value: string): string {
     const parts = value.split('/');
-    if (kind === 'table' && parts[0] === table) parts[0] = to;
+    if ((kind === 'table' || kind === 'document') && parts[0] === table) parts[0] = to;
     if (kind === 'key' && parts[0] === table && parts[1] === key) parts[1] = to;
     if (kind === 'column' && shared.has(parts[0]!) && parts[2] === column) parts[2] = to;
+    if ((kind === 'heading' || kind === 'tag') && documentPathMatches(value, path)) parts[path.split('/').length - 1] = to;
     return parts.join('/');
   }
   function fieldValue(name: string, field: string, value: unknown): unknown {
@@ -63,6 +67,36 @@ export function renamePlanReferences(project: Project, kind: RenameKind, path: s
     }
     for (const section of ['remove', 'base_missing']) {
       if (Array.isArray(data[section])) data[section] = data[section].map(value => typeof value === 'string' ? address(value) : value);
+    }
+    for (const section of ['documents', 'document_base_values']) {
+      const mapping = data[section];
+      if (!isRecord(mapping)) continue;
+      const renamed: Record<string, string> = Object.create(null);
+      for (const [location, raw] of Object.entries(mapping)) {
+        if (typeof raw !== 'string') continue;
+        const next = address(location);
+        if (Object.hasOwn(renamed, next)) throw new VibeError('NAME_EXISTS', 'A variant already uses scope: ' + next);
+        let value = raw;
+        if ((kind === 'heading' || kind === 'tag') && documentPathMatches(path, location)) {
+          const name = location.split('/')[0]!;
+          const blocks = parseMarkdown(name, raw).blocks;
+          const parent = location.split('/').slice(1, -1);
+          const relativePath = (p: string) => location === name ? p : [name, ...parent, ...p.split('/').slice(1)].join('/');
+          const block = blocks.find(b => b.path && relativePath(b.path) === path);
+          if (block) {
+            if (kind === 'heading') {
+              const heading = markdownTree(raw).children.find(n => n.type === 'heading' && nodeStart(n) === block.start);
+              if (heading?.type === 'heading') { const edit = headingNameEdit(raw, heading, to); value = raw.slice(0, edit.start) + edit.text + raw.slice(edit.end); }
+            } else {
+              const comment = block.markdown.split(/\r\n|\r|\n/)[0]!;
+              const old = nameComment.exec(comment)?.[1];
+              if (old) { const start = block.start + comment.indexOf(old); value = raw.slice(0, start) + to + raw.slice(start + old.length); }
+            }
+          }
+        }
+        renamed[next] = rewriteMarkdownPaths(next.split('/')[0]!, value, address);
+      }
+      data[section] = renamed;
     }
     if (!isDeepStrictEqual(parsed.data, data)) changes.set(file, formatYaml(parseYaml(JSON.stringify(data), file)).source);
   }
@@ -117,6 +151,20 @@ export function planUsages(project: Project, path: string): Usages {
       if (Array.isArray(values)) values.forEach((location, i) => {
         if (typeof location === 'string' && matches(location)) usage(file, [section, i], result.references);
       });
+    }
+    for (const section of ['documents', 'document_base_values']) {
+      const mapping = file.data[section];
+      if (!isRecord(mapping)) continue;
+      for (const [location, value] of Object.entries(mapping)) {
+        const parts = [section, location];
+        if (documentPathMatches(location, path)) usage(file, parts, result.references);
+        if (typeof value !== 'string') continue;
+        const parsed = parseMarkdown(location.split('/')[0]!, value);
+        if (parsed.links.some(link => link.kind === 'resource' && link.path && documentPathMatches(link.path, path, true))) usage(file, parts, result.references);
+        let prose = value;
+        for (const link of [...parsed.links].sort((a, b) => b.start - a.start)) prose = prose.slice(0, link.start) + prose.slice(link.end);
+        text(file, parts, prose);
+      }
     }
     text(file, ['sources'], file.data.sources);
   }

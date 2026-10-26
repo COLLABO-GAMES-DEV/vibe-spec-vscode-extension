@@ -38,3 +38,8 @@ export { resourceEntry, resourceEntries, resourceFile, resourcePath, folderError
 export type { ResourceKind, ResourceEntry } from './resources.js';
 export type { FolderOperation } from './folder-types.js';
 export { applyFolderEdit } from './folders.js';
+
+export { documentScope, documentScopes, documentVariantChanges } from './document-variants.js';
+export type { DocumentScope } from './document-variants.js';
+export { getTargetDocumentView, saveTargetDocumentSnapshots, editVariantDocument } from './document-targets.js';
+export type { TargetDocumentView, TargetDocumentSnapshot } from './document-targets.js';

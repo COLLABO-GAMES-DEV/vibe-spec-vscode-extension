@@ -1,3 +1,4 @@
+import { documentScope, documentVariantChanges } from './document-variants.js';
 import { isDeepStrictEqual } from 'node:util';
 import { isMap, isScalar, isSeq } from 'yaml';
 import type { Cell, Diagnostic, EditOperation, MutationOptions, Project, WriteResult } from './types.js';
@@ -111,8 +112,9 @@ function address(path: string, length: number, file: string): string[] {
 
 function patch(data: unknown, file: string, stored: boolean): VariantInput {
   checkSources(data, file);
-  const allowed = ['set', 'add', 'remove', 'sources', ...(stored ? ['base_values', 'base_missing'] : [])];
+  const allowed = ['set', 'add', 'remove', 'sources', 'documents', ...(stored ? ['base_values', 'base_missing', 'document_base_values'] : [])];
   if (!isRecord(data) || Object.keys(data).some(key => !allowed.includes(key)) ||
+      (data.documents !== undefined && (!isRecord(data.documents) || !Object.values(data.documents).every(value => typeof value === 'string'))) ||
       (data.set !== undefined && (!isRecord(data.set) || !Object.values(data.set).every(cell))) ||
       (data.add !== undefined && (!isRecord(data.add) || !Object.values(data.add).every(row => isRecord(row) && Object.values(row).every(cell)))) ||
       (data.remove !== undefined && (!Array.isArray(data.remove) || !data.remove.every(path => typeof path === 'string')))) {
@@ -161,6 +163,11 @@ function variantAt(project: Project, plan: string, name: string): Variant {
         (captured && !(path.split('/').length === 3 ? cell(value) : isRecord(value)))) {
       fail('VARIANT_SHAPE', file, path, 'Each patch path needs exactly one original base value or base_missing entry.');
     }
+  }
+  const docs = Object.keys(input.documents ?? {});
+  if ((record.document_base_values !== undefined && !isRecord(record.document_base_values)) ||
+      docs.length !== Object.keys(record.document_base_values ?? {}).length || docs.some(path => typeof (record.document_base_values as Record<string, unknown> | undefined)?.[path] !== 'string')) {
+    fail('VARIANT_SHAPE', file, '', 'Each document scope needs exactly one original Markdown value.');
   }
   return data as Variant;
 }
@@ -235,7 +242,9 @@ function changesFor(project: Project, input: VariantInput, file: string): Map<st
     const [table, key] = path.split('/');
     operations.push({ op: 'update', table: table!, key: key!, values });
   }
-  return operations.length ? prepareEdits(project, operations) : new Map();
+  const changes = operations.length ? prepareEdits(project, operations) : new Map<string, string>();
+  for (const [path, source] of documentVariantChanges(project, input.documents)) changes.set(path, source);
+  return changes;
 }
 
 function composed(project: Project, input: VariantInput, file: string): Project {
@@ -245,7 +254,12 @@ function composed(project: Project, input: VariantInput, file: string): Project 
 
 function warnings(project: Project, input: Variant, file: string): Diagnostic[] {
   const contexts = tableContexts(project);
-  return touched(input).flatMap(path => {
+  const docWarnings: Diagnostic[] = Object.entries(input.documents ?? {}).flatMap(([path, alternative]) => {
+    const old = input.document_base_values![path], current = documentScope(project, path).markdown;
+    return old === current ? [] : [{ code: 'BASE_CHANGED', severity: 'warning', file, path,
+      message: 'Document baseline changed: old=' + JSON.stringify(old) + '; current=' + JSON.stringify(current) + '; alternative=' + JSON.stringify(alternative) }];
+  });
+  return [...docWarnings, ...touched(input).flatMap(path => {
     const old = Object.hasOwn(input.base_values, path) ? { present: true, value: input.base_values[path] } : absent();
     const current = valueAt(contexts, path);
     if (isDeepStrictEqual(old, current)) return [];
@@ -253,7 +267,7 @@ function warnings(project: Project, input: Variant, file: string): Diagnostic[] 
       Object.hasOwn(input.add ?? {}, path) ? { present: true, value: input.add![path] } : absent();
     return [{ code: 'BASE_CHANGED', severity: 'warning' as const, file, path,
       message: 'Baseline changed: old=' + JSON.stringify(old) + '; current=' + JSON.stringify(current) + '; alternative=' + JSON.stringify(alternative) }];
-  });
+  })];
 }
 
 function diagnosticsFrom(error: unknown, file: string): Diagnostic[] {
@@ -318,7 +332,14 @@ export function getPlan(project: Project, name: string): PlanView {
     }));
     return { path, baseline: current, alternatives };
   });
-  return { revision: project.revision, plan, variants, comparison, diagnostics };
+  const documentPaths = new Set(Object.values(variants).flatMap(input => Object.keys(input.documents ?? {})));
+  const documentComparison = sorted(documentPaths).map(path => {
+    let current: PlanValue = absent();
+    try { current = { present: true, value: documentScope(project, path).markdown }; } catch { /* Missing scope is a composition error above. */ }
+    return { path, kind: 'document' as const, baseline: current, alternatives: Object.fromEntries(Object.entries(variants).map(([name, input]) =>
+      [name, Object.hasOwn(input.documents ?? {}, path) ? { present: true, value: input.documents![path] } : current])) };
+  });
+  return { revision: project.revision, plan, variants, comparison: [...comparison, ...documentComparison], diagnostics };
 }
 
 export function readVariant(project: Project, plan: string, variant: string): Project {
@@ -336,8 +357,9 @@ function ordered<T>(record: Record<string, T>): Record<string, T> {
   return Object.fromEntries(sorted(Object.keys(record)).map(key => [key, record[key]!]));
 }
 
-function variantYaml(input: VariantInput, base_values: Variant['base_values'], base_missing: string[], file: string): string {
+function variantYaml(input: VariantInput, base_values: Variant['base_values'], base_missing: string[], file: string, document_base_values: Record<string, string> = {}): string {
   return yaml({
+    ...(input.documents === undefined ? {} : { documents: ordered(input.documents), document_base_values: ordered(document_base_values) }),
     ...(input.set === undefined ? {} : { set: ordered(input.set) }),
     ...(input.add === undefined ? {} : { add: ordered(Object.fromEntries(Object.entries(input.add).map(([path, row]) => [path, ordered(row)]))) }),
     ...(input.remove === undefined ? {} : { remove: sorted(input.remove) }),
@@ -365,27 +387,34 @@ export async function createPlan(root: string, revision: string, name: string, i
 
 export async function writeVariant(root: string, revision: string, plan: string, name: string, input: VariantInput, options: MutationOptions = {}): Promise<WriteResult> {
   return mutateProject(root, revision, before => {
-    editable(before, plan);
-    const file = variantPath(plan, name);
-    checkName(name, file);
-    checkCollision(name, variantNames(before, plan), file, true);
-    patch(input, file, false);
-    changesFor(baseline(before), input, file);
-    const previous = before.sources.has(file) ? variantAt(before, plan, name) : undefined;
-    const contexts = tableContexts(before);
-    const base_values: Variant['base_values'] = Object.create(null) as Variant['base_values'];
-    const base_missing: string[] = [];
-    for (const path of touched(input)) {
-      if (previous && Object.hasOwn(previous.base_values, path)) base_values[path] = previous.base_values[path]!;
-      else if (previous?.base_missing.includes(path)) base_missing.push(path);
-      else {
-        const current = valueAt(contexts, path);
-        if (current.present) base_values[path] = current.value as Cell | Record<string, unknown>;
-        else base_missing.push(path);
-      }
-    }
-    return new Map([[file, variantYaml(input, base_values, base_missing, file)]]);
+    return prepareVariantWrite(before, plan, name, input);
   }, options);
+}
+
+export function prepareVariantWrite(before: Project, plan: string, name: string, input: VariantInput): Map<string, string> {
+  editable(before, plan);
+  const file = variantPath(plan, name);
+  checkName(name, file);
+  checkCollision(name, variantNames(before, plan), file, true);
+  patch(input, file, false);
+  changesFor(baseline(before), input, file);
+  const previous = before.sources.has(file) ? variantAt(before, plan, name) : undefined;
+  const contexts = tableContexts(before);
+  const base_values: Variant['base_values'] = Object.create(null) as Variant['base_values'];
+  const base_missing: string[] = [];
+  for (const path of touched(input)) {
+    if (previous && Object.hasOwn(previous.base_values, path)) base_values[path] = previous.base_values[path]!;
+    else if (previous?.base_missing.includes(path)) base_missing.push(path);
+    else {
+      const current = valueAt(contexts, path);
+      if (current.present) base_values[path] = current.value as Cell | Record<string, unknown>;
+      else base_missing.push(path);
+    }
+  }
+  const document_base_values = Object.fromEntries(Object.keys(input.documents ?? {}).map(path => [path,
+    previous?.document_base_values?.[path] ?? documentScope(before, path).markdown]));
+  const source = variantYaml(input, base_values, base_missing, file, document_base_values);
+  return new Map([[file, previous && isDeepStrictEqual(parseYaml(source, file).data, dataAt(before, file)) ? before.sources.get(file)! : source]]);
 }
 
 export async function setPlanStatus(root: string, revision: string, name: string, status: 'draft' | 'review', options: MutationOptions = {}): Promise<WriteResult> {

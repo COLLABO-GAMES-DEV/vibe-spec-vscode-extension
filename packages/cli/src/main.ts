@@ -10,6 +10,7 @@ import {
   exportMarkdown, inspectSource,
   getGitStatus, saveProject, pushProject, pullProject, resolveProject,
   listPlans, getPlan, readVariant, createPlan, writeVariant, setPlanStatus, approvePlan,
+  getTargetDocumentView, editVariantDocument,
   listDocuments, getDocumentView, createDocument, editDocument, deleteDocument, addDocumentImage,
   resourceNameError, applyFolderEdit, listFolders,
 } from '@vibe-spec/core';
@@ -19,9 +20,9 @@ const usage = `Usage:
   vibe init <folder> [--json]
   vibe read <table-or-path> [--target base|<plan>/<variant>] [--project <folder>] [--json]
   vibe document list [--project <folder>] [--json]
-  vibe document read <name> [--project <folder>] [--json]
+  vibe document read <name> [--target base|<plan>/<variant>] [--project <folder>] [--json]
   vibe document create <name> [--folder <path>] --input <markdown-file> --target base --expect-revision <revision> [--dry-run] [--project <folder>] [--json]
-  vibe document edit <name> --input <operations-json> --target base --expect-revision <revision> [--dry-run] [--project <folder>] [--json]
+  vibe document edit <name> --input <operations-json> --target base|<plan>/<variant> --expect-revision <revision> [--dry-run] [--project <folder>] [--json]
   vibe document delete <name> --target base --expect-revision <revision> [--dry-run] [--project <folder>] [--json]
   vibe document image <input-file> --target base --expect-revision <revision> [--dry-run] [--project <folder>] [--json]
   vibe folder list [--project <folder>] [--json]
@@ -179,7 +180,7 @@ async function main() {
       if (values.target !== undefined && command !== 'read' && command !== 'document' && !baselineWrite && !folderWrite) {
         throw new VibeError('INVALID_ARGUMENT', '--target is available for read, document, edit, apply, rename, folder writes, move and import apply.');
       }
-      if ((baselineWrite || command === 'document' || folderWrite) && selectedTarget !== 'base') {
+      if ((baselineWrite || command === 'document' && target !== 'read' && target !== 'edit' || folderWrite) && selectedTarget !== 'base') {
         throw new VibeError('INVALID_ARGUMENT', 'Use --target base here; write alternatives with plan variant <plan>/<variant>.');
       }
       if ((documentWrite || documentRename || folderWrite) && values.target === undefined) {
@@ -267,7 +268,7 @@ async function main() {
         }
         if (command === 'document') {
           if (target === 'list') data = listDocuments(project);
-          else if (target === 'read') data = getDocumentView(project, positionals[2]!);
+          else if (target === 'read') data = getTargetDocumentView(project, positionals[2]!, selectedTarget);
           else {
             const revision = values['expect-revision'];
             if (!revision) throw new VibeError('REVISION_REQUIRED', 'Supply --expect-revision from document read or validate.');
@@ -287,7 +288,9 @@ async function main() {
                   const markdown = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(await readFile(values.input));
                   result = await createDocument(project.root, revision, positionals[2]!, markdown, { ...options, ...(values.folder !== undefined ? { folder: values.folder } : {}) });
                 } else {
-                  result = await editDocument(project.root, revision, positionals[2]!, await readJson(values.input) as DocumentOperation[], options);
+                  const operations = await readJson(values.input) as DocumentOperation[];
+                  result = selectedTarget === 'base' ? await editDocument(project.root, revision, positionals[2]!, operations, options)
+                    : await editVariantDocument(project.root, revision, positionals[2]!, selectedTarget!, operations, options);
                 }
               }
               project = result.project;

@@ -245,7 +245,7 @@ describe('document commands in actual CLI processes', () => {
     expect(cli(root, ['validate']).status).toBe(0);
   });
 
-  it('requires an explicit base target and revision for every document write before plans exist', async () => {
+  it('requires an explicit target and revision, and keeps non-edit document writes on base', async () => {
     const root = await planning();
     const markdown = await input(root, '# Guide\n');
     const operations = await input(root, '[]', 'operations.json');
@@ -261,7 +261,7 @@ describe('document commands in actual CLI processes', () => {
         data: { applied: false, changed: [] }, error: { code: 'TARGET_REQUIRED' },
       } });
       expect(cli(root, [...args, '--target', 'base'])).toMatchObject({ status: 2, reply: { error: { code: 'REVISION_REQUIRED' } } });
-      expect(cli(root, [...args, '--target', 'review/A', '--expect-revision', current])).toMatchObject({ status: 2, reply: { error: { code: 'INVALID_ARGUMENT' } } });
+      expect(cli(root, [...args, '--target', 'review/A', '--expect-revision', current])).toMatchObject({ status: 2, reply: { error: { code: args[0] === 'document' && args[1] === 'edit' ? 'PATH_NOT_FOUND' : 'INVALID_ARGUMENT' } } });
     }
     expect(await documentFiles(root)).toEqual([]);
     expect(revision(root)).toBe(current);

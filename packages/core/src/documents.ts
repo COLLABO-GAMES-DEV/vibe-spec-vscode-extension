@@ -1,3 +1,4 @@
+import { renamePlanReferences } from './plan-references.js';
 import { resourceEntries, resourceEntry, resourceFile, resourcePath } from './resources.js';
 import type { Heading } from 'mdast';
 import type { Diagnostic, MutationOptions, Project, WriteResult } from './types.js';
@@ -5,7 +6,7 @@ import { isRecord, VibeError } from './types.js';
 import type { DocumentBlock, DocumentOperation, DocumentSnapshot, DocumentSummary, DocumentView, ParsedDocument } from './document-types.js';
 import { markdownTree, nameComment, nodeEnd, nodeStart, parseMarkdown } from './document-parser.js';
 import { documentPathMatches, documentSources, documentUsages, renameDocumentLinks, rewriteDocumentPaths } from './document-references.js';
-import { mutateProject, readPath } from './project.js';
+import { mutateProject, projectWithChanges, readPath } from './project.js';
 import { compareResourceNames, resourceNameError, resourceNameKey, suggestResourceName } from './names.js';
 import { textCandidates } from './usage.js';
 import { checkMarkdownSource as checkSource, composeDocumentSnapshot } from './document-snapshot.js';
@@ -153,7 +154,7 @@ function assertFreePath(parsed: ParsedDocument, oldPath: string, nextPath: strin
     throw new VibeError('NAME_EXISTS', 'A heading or tag already uses this path: ' + nextPath);
   }
 }
-function headingNameEdit(source: string, heading: Heading, to: string): Splice {
+export function headingNameEdit(source: string, heading: Heading, to: string): Splice {
   const text = to.replace(/[!"#$%&'()*+,\-./:;<=>?@[\]\\^_`{|}~]/g, '\\$&');
   if (heading.children.length === 1) {
     let leaf = heading.children[0]!;
@@ -168,7 +169,7 @@ function headingNameEdit(source: string, heading: Heading, to: string): Splice {
   return { start: nodeStart(heading.children[0]!), end: nodeEnd(heading.children.at(-1)!), text };
 }
 
-interface DocumentRename { path: string; to: string }
+interface DocumentRename { path: string; to: string; kind: 'heading' | 'tag' }
 
 /** The same conservative heading/tag rename inference serves both write APIs. */
 function replacementRename(parsed: ParsedDocument, block: DocumentBlock, markdown: string): DocumentRename | undefined {
@@ -182,7 +183,7 @@ function replacementRename(parsed: ParsedDocument, block: DocumentBlock, markdow
     checkSegment(to, oldHeading ? 'heading' : 'tag');
     const nextPath = block.path.slice(0, block.path.lastIndexOf('/') + 1) + to;
     assertFreePath(parsed, block.path, nextPath);
-    if (nextPath !== block.path) return { path: block.path, to };
+    if (nextPath !== block.path) return { path: block.path, to, kind: oldHeading ? 'heading' : 'tag' };
   }
 }
 
@@ -219,38 +220,45 @@ export async function saveDocumentSnapshots(
 ): Promise<WriteResult> {
   if (!Array.isArray(snapshots)) throw new VibeError('INVALID_ARGUMENT', 'Expected an array of document snapshots.');
   return mutateProject(root, revision, before => {
-    const changes = new Map<string, string>(), seen = new Set<string>(), renamed: DocumentRename[] = [];
-    const prepared: { parsed: ParsedDocument; next: ParsedDocument; removed: Set<number> }[] = [];
-    for (const snapshot of snapshots) {
-      if (!isRecord(snapshot) || typeof snapshot.name !== 'string' || !Array.isArray(snapshot.blocks) ||
-          Object.keys(snapshot).some(key => !['name', 'blocks'].includes(key))) {
-        throw new VibeError('INVALID_ARGUMENT', 'Expected a document name and snapshot blocks.');
-      }
-      const parsed = document(before, snapshot.name), file = fileOf(before, snapshot.name);
-      if (seen.has(file)) throw new VibeError('EDIT_OVERLAP', 'A document can appear only once in a snapshot batch.');
-      seen.add(file);
-      const { source, unchanged, removed } = composeDocumentSnapshot(parsed, snapshot.blocks);
-      if (source === parsed.source) continue;
-      const next = parseMarkdown(parsed.name, source);
-      for (const { block, start, end } of unchanged) checkBlockBoundary(next, block, start, end);
-      for (const block of snapshot.blocks) {
-        if (block.original === undefined || block.markdown === undefined) continue;
-        const rename = replacementRename(parsed, parsed.blocks[block.original]!, block.markdown);
-        if (rename) renamed.push(rename);
-      }
-      changes.set(file, source);
-      prepared.push({ parsed, next, removed });
-    }
-    const composed = { ...before, sources: new Map([...before.sources, ...changes]) };
-    const renamePath = documentRenamePath(renamed);
-    for (const { parsed, next, removed } of prepared) {
-      checkReferencedStructure(composed, parsed, next, removed, renamePath);
-    }
-    if (renamed.length) {
-      for (const [file, source] of rewriteDocumentPaths(composed, renamePath)) changes.set(file, source);
-    }
-    return changes;
+    return prepareDocumentSnapshots(before, snapshots);
   }, options);
+}
+
+export function prepareDocumentSnapshots(before: Project, snapshots: DocumentSnapshot[]): Map<string, string> {
+  const changes = new Map<string, string>(), seen = new Set<string>(), renamed: DocumentRename[] = [];
+  const prepared: { parsed: ParsedDocument; next: ParsedDocument; removed: Set<number> }[] = [];
+  for (const snapshot of snapshots) {
+    if (!isRecord(snapshot) || typeof snapshot.name !== 'string' || !Array.isArray(snapshot.blocks) ||
+        Object.keys(snapshot).some(key => !['name', 'blocks'].includes(key))) {
+      throw new VibeError('INVALID_ARGUMENT', 'Expected a document name and snapshot blocks.');
+    }
+    const parsed = document(before, snapshot.name), file = fileOf(before, snapshot.name);
+    if (seen.has(file)) throw new VibeError('EDIT_OVERLAP', 'A document can appear only once in a snapshot batch.');
+    seen.add(file);
+    const { source, unchanged, removed } = composeDocumentSnapshot(parsed, snapshot.blocks);
+    if (source === parsed.source) continue;
+    const next = parseMarkdown(parsed.name, source);
+    for (const { block, start, end } of unchanged) checkBlockBoundary(next, block, start, end);
+    for (const block of snapshot.blocks) {
+      if (block.original === undefined || block.markdown === undefined) continue;
+      const rename = replacementRename(parsed, parsed.blocks[block.original]!, block.markdown);
+      if (rename) renamed.push(rename);
+    }
+    changes.set(file, source);
+    prepared.push({ parsed, next, removed });
+  }
+  const composed = { ...before, sources: new Map([...before.sources, ...changes]) };
+  const renamePath = documentRenamePath(renamed);
+  for (const { parsed, next, removed } of prepared) {
+    checkReferencedStructure(composed, parsed, next, removed, renamePath);
+  }
+  if (renamed.length) {
+    for (const [file, source] of rewriteDocumentPaths(composed, renamePath)) changes.set(file, source);
+  }
+  for (const rename of renamed) {
+    for (const [file, value] of renamePlanReferences(projectWithChanges(before, changes), rename.kind, rename.path, rename.to)) changes.set(file, value);
+  }
+  return changes;
 }
 
 export async function editDocument(
@@ -259,7 +267,7 @@ export async function editDocument(
   if (!Array.isArray(operations)) throw new VibeError('INVALID_OPERATIONS', 'Expected an array of document operations.');
   return mutateProject(root, revision, before => {
     const parsed = document(before, name), edits: Splice[] = [];
-    const renamed: { path: string; to: string }[] = [];
+    const renamed: DocumentRename[] = [];
     const removed = new Set<number>(), replaced = new Set<number>(), changedBlocks = new Set<number>();
     for (const operation of operations) {
       if (!isRecord(operation) || !['insert', 'replace', 'delete'].includes(String(operation.op))) {
@@ -324,6 +332,9 @@ export async function editDocument(
     if (renamed.length) {
       for (const [file, value] of rewriteDocumentPaths(withSource(before, name, source), renamePath)) changes.set(file, value);
     }
+    for (const rename of renamed) {
+      for (const [file, value] of renamePlanReferences(projectWithChanges(before, changes), rename.kind, rename.path, rename.to)) changes.set(file, value);
+    }
     return changes;
   }, options);
 }
@@ -353,6 +364,7 @@ export async function renameDocument(
       checkName(before, to, name);
       candidates = await textCandidates(before, name);
       for (const [file, source] of renameDocumentLinks(before, kind, path, to)) changes.set(file, source);
+      for (const [file, source] of renamePlanReferences(before, kind, path, to)) changes.set(file, source);
       const renamedSource = changes.get(fileOf(before, name)) ?? parsed.source;
       changes.delete(fileOf(before, name));
       changes.set(resourcePath('document', to, resourceEntry(fileOf(before, name))!.folder), renamedSource);
@@ -380,6 +392,7 @@ export async function renameDocument(
     const source = spliceSource(parsed.source, [edit]);
     changes.set(fileOf(before, name), source);
     for (const [file, value] of renameDocumentLinks(withSource(before, name, source), kind, path, to)) changes.set(file, value);
+    for (const [file, value] of renamePlanReferences(before, kind, path, to)) changes.set(file, value);
     return changes;
   }, options);
   return { ...result, candidates };

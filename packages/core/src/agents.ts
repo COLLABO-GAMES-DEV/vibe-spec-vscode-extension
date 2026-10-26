@@ -97,7 +97,7 @@ vibe rename tag balance/화폐/설명 --target base --to 안내 --expect-revisio
 vibe where-used balance/화폐 --json
 \`\`\`
 
-문서 쓰기는 기획 생성 전에도 항상 \`--target base --expect-revision\`이 필수다. create/edit/delete/image는 먼저 --dry-run 결과를 확인하고 같은 입력·revision에서 --dry-run만 빼고 적용한다. create의 --input은 UTF-8 Markdown 파일이며 BOM도 원문 그대로 보존한다. edit의 --input은 다음과 같은 JSON 배열이다.
+기준안 문서 쓰기는 기획 생성 전에도 항상 \`--target base --expect-revision\`이 필수다. create/edit/delete/image는 먼저 --dry-run 결과를 확인하고 같은 입력·revision에서 --dry-run만 빼고 적용한다. create의 --input은 UTF-8 Markdown 파일이며 BOM도 원문 그대로 보존한다. edit의 --input은 다음과 같은 JSON 배열이다.
 
 \`\`\`json
 [{"op":"replace","block":1,"markdown":"고친 문단"},{"op":"insert","before":2,"markdown":"새 문단"},{"op":"delete","block":3}]
@@ -107,9 +107,15 @@ block과 before는 0부터 시작하며 같은 읽기 revision의 블록 순번�
 
 제목·이름표와 참조된 이름을 바꿀 때는 rename을 사용한다. 일반 문구·코드의 이름 후보는 자동 치환하지 않는다. 이미지 추가 결과의 path는 \`assets/<파일명>\`이며 \`![설명](assets/<파일명>)\`으로 연결한다. 이미지는 \`documents/assets/\`에 저장되고 문서 본문은 별도의 블록 편집으로 연결한다. revision이 오래되면 document read로 새 원문과 요청을 비교하고 순번·범위를 다시 고른다.
 
+## 문서 대안 편집
+
+문서 대안도 core가 합친 결과로만 읽는다. 먼저 plan variant 입력에 documents: {"economy/재화": "## 재화\\n\\n대안 본문"}처럼 범위를 선언한다. 문서 전체 이름, 제목 경로 또는 이름표 문단만 선택할 수 있다. 목록·표 개별 선택과 범위 중첩은 지원하지 않는다. document_base_values는 core가 캡처하므로 입력에 쓰거나 갱신하지 않는다.
+
+vibe document read economy --target review/A --json으로 합쳐진 블록·revision·selectedScopes를 읽는다. vibe document edit economy --target review/A --input blocks.json --expect-revision <읽은_revision> --dry-run --json으로 확인한 후 적용한다. 작업 순번은 그 합친 문서 revision 안에서만 유효하다. 대안 YAML만 바뀌며 기준안 Markdown은 확정 전까지 바뀌지 않는다. 선택한 제목·이름표는 유지하고 범위 밖 편집은 거절한다. plan read에서 이전 기준/현재 기준/대안을 확인하며, 사람이 선택한 경우에만 plan approve를 실행한다. 원문 출처를 우선순위로 자동 선택하지 않는다.
+
 ## 기획 단위와 대안
 
-에이전트는 기획이 아직 없어도 기준안 읽기·쓰기 예시에 항상 \`--target base\`를 명시한다. CLI는 기획 생성 전의 기존 쓰기만 대상 생략을 허용한다. 기획이 있으면 edit/apply/rename/import apply에 \`--target base\`가 필수이며 다른 대상은 거절한다. 대안은 \`plan variant\`로만 쓴다.
+에이전트는 기획이 아직 없어도 기준안 읽기·쓰기 예시에 항상 \`--target base\`를 명시한다. CLI는 기획 생성 전의 기존 쓰기만 대상 생략을 허용한다. 기획이 있으면 edit/apply/rename/import apply에 \`--target base\`가 필수이며 다른 대상은 거절한다. 테이블 대안은 \`plan variant\`로 쓴다. 문서 대안의 편집은 아래 문서 대상 규칙도 따른다.
 
 \`\`\`sh
 vibe plan list --json
