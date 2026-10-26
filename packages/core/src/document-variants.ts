@@ -15,8 +15,10 @@ export function documentScope(project: Project, path: string): DocumentScope {
   const file = resourceFile(project, 'document', name), source = file && project.sources.get(file);
   if (!file || source === undefined) throw new VibeError('PATH_NOT_FOUND', 'Unknown document: ' + name);
   const parsed = parseMarkdown(name, source);
-  let start = parsed.blocks[0]?.start ?? (source.startsWith('\uFEFF') ? 1 : 0);
-  let end = parsed.blocks.at(-1)?.end ?? start;
+  // A whole document includes its whitespace body, even when it has no blocks.
+  // The BOM is a file prefix, never part of an alternative's Markdown payload.
+  let start = source.startsWith('\uFEFF') ? 1 : 0;
+  let end = source.length;
   let kind: DocumentScope['kind'] = 'document';
   if (parts.length > 1) {
     const blocks = parsed.blocks.filter(block => block.path === path);

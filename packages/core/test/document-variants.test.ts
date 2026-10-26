@@ -87,7 +87,8 @@ it('captures new selected scopes while keeping every other snapshot byte and acc
   const path = 'rules/前 😀/선택'; const view = getTargetDocumentView(p, 'rules', 'review/A', [path]);
   const index = view.blocks.find(b => b.markdown === '내용')!.index;
   const blocks = view.blocks.flatMap<DocumentSnapshotBlock>(b => b.index === index ? [{ original: b.index, markdown: '- first\n- second' }, { markdown: '> note' }] : [{ original: b.index }]);
-  p = (await saveTargetDocumentSnapshots(p.root, p.revision, [{ name: 'rules', target: 'review/A', scopes: [path], blocks }])).project;
+  p = (await saveTargetDocumentSnapshots(p.root, p.revision, [{ name: 'rules', target: 'review/A', scopes: ['rules/바깥', path], blocks }])).project;
+  expect(Object.keys(getPlan(p, 'review').variants.A!.documents!)).toEqual([path]);
   expect(p.sources.get('documents/rules.md')).toBe(source);
   const changed = getTargetDocumentView(p, 'rules', 'review/A');
   expect(changed.source).toContain('- first\n- second'); expect(changed.source).toContain('> note');
@@ -100,4 +101,16 @@ it('compares composed scope values when alternatives choose different nested sco
   const rows = getPlan(p, 'review').comparison;
   expect(rows.find(row => row.path === section)?.alternatives.B?.value).toBe(documentScope(readVariant(p, 'review', 'B'), section).markdown);
   expect(rows.find(row => row.path === paragraph)?.alternatives.A?.value).toBe(documentScope(readVariant(p, 'review', 'A'), paragraph).markdown);
+});
+it('treats an empty whole document as its full body and keeps BOM and whitespace through insertion and no-op save', async () => {
+  let p = await fixture(); const blank = '\uFEFF \r\n';
+  await writeFile(join(p.root, 'documents/rules.md'), blank); p = await loadProject(p.root);
+  p = (await writeVariant(p.root, p.revision, 'review', 'A', {})).project;
+  p = (await saveTargetDocumentSnapshots(p.root, p.revision, [{ name: 'rules', target: 'review/A', scopes: ['rules'], blocks: [{ markdown: 'First' }] }])).project;
+  const view = getTargetDocumentView(p, 'rules', 'review/A');
+  expect(view.source).toBe('\uFEFFFirst \r\n');
+  const noChange = await saveTargetDocumentSnapshots(p.root, p.revision, [{ name: 'rules', target: 'review/A', blocks: view.blocks.map(b => ({ original: b.index })) }]);
+  expect(noChange.changed).toEqual([]); expect(p.sources.get('documents/rules.md')).toBe(blank);
+  p = (await approvePlan(p.root, p.revision, 'review', 'A')).project;
+  expect(p.sources.get('documents/rules.md')).toBe('\uFEFFFirst \r\n');
 });

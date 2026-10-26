@@ -80,3 +80,17 @@ test('different nested scopes in A and B compare each composed result rather tha
   await expect(row.getByRole('cell').nth(2)).toContainText('선택 내용');
   await expect(row.getByRole('cell').nth(2)).toHaveAttribute('data-touched', 'true');
 });
+test('keeps native undo after saving multiple scopes selected in a different order', async ({ page }) => {
+  await page.goto('/?mode=documents&document=' + encodeURIComponent(name));
+  await page.getByLabel('문서 편집 대상 선택').selectOption('document-review/A');
+  for (const path of [name + '/Outside', name + '/Intro/Debate']) {
+    const checkbox = page.getByRole('checkbox', { name: path + ' (섹션)', exact: true });
+    await checkbox.click(); await expect(checkbox).toBeChecked();
+  }
+  const body = rich(page).locator('.bn-inline-content').filter({ hasText: /^선택 내용$/ });
+  await body.fill('두 범위 변경');
+  await save(page);
+  await rich(page).press('ControlOrMeta+z');
+  await expect(rich(page).locator('.bn-inline-content').filter({ hasText: /^선택 내용$/ })).toBeVisible();
+  await expect(page.locator('.document-save-state')).toHaveText('저장하지 않은 변경');
+});

@@ -194,7 +194,7 @@ export function DocumentsApp({ host }: { host: DocumentsHost }) {
             host.send({ type: 'documentDraft', dirty: false }); }}>버리고 현재 파일 읽기</button></section>}
       </section>}
       <section className="document-blocks" aria-label="문서 본문">
-        <DocumentEditor key={JSON.stringify([view.name, targetView?.target, targetView?.selectedScopes, screen.epoch])} allowedBlocks={allowedBlocks} lockedHeadings={isVariant ? targetView.selectedScopes.filter(path => targetView.scopes.some(s => s.path === path && s.kind === 'section')) : []} view={view} assets={state.assets} disabled={busy} focusPath={state.focusPath}
+        <DocumentEditor key={JSON.stringify([view.name, targetView?.target, targetView?.selectedScopes.slice().sort(), screen.epoch])} allowedBlocks={allowedBlocks} lockedHeadings={isVariant ? targetView.selectedScopes.filter(path => targetView.scopes.some(s => s.path === path && s.kind === 'section')) : []} view={view} assets={state.assets} disabled={busy} focusPath={state.focusPath}
           handleRef={editor} uploadImage={uploadImage} navigate={navigate}
           onError={message => update(previous => ({ ...previous, error: message }))}
           onChange={(nextDirty, firstHeading) => {

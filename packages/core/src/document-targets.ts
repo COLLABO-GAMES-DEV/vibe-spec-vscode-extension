@@ -85,7 +85,9 @@ export async function saveTargetDocumentSnapshots(root: string, revision: string
       const rebuilt = documentVariantChanges(composed, replacements).get(file) ?? view.source;
       assertScopedSnapshot(view, snapshot.blocks, rebuilt, next);
       const input = inputs.get(target) ?? inputAt(before, target);
-      input.documents = { ...input.documents, ...replacements };
+      const changedScopes = Object.fromEntries(Object.entries(replacements).filter(([path, markdown]) =>
+        Object.hasOwn(input.documents ?? {}, path) || markdown !== documentScope(composed, path).markdown));
+      input.documents = { ...input.documents, ...changedScopes };
       inputs.set(target, input);
     }
     for (const [target, input] of inputs) {
