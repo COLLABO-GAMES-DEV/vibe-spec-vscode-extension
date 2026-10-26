@@ -142,3 +142,7 @@ vibe rename column "shop-products/*/price_currency" --target base --to currency 
 `vibe folder list/create/rename/move/delete`, `vibe move <table|document> <name> --folder <상대 폴더>`를 제공한다. 최상위는 빈 문자열이다. 쓰기는 `--target base --expect-revision`과 `--dry-run`을 사용하며 결과에 변경 파일·revision·검증을 반환한다. table-create와 document create는 선택적 `--folder`를 받고 기본은 기존 최상위다. read·rename·where-used의 공개 참조 주소에는 폴더를 쓰지 않는다. AGENTS.md도 이 구분을 안내한다.
 
 이관 mapping의 선택적 `folder`는 표의 목적지이며 기존 mapping은 최상위로 적용한다. 개발용 Markdown 내보내기는 테이블의 도메인 하위 폴더를 출력 폴더에도 보존하고, 파일 내 테이블명·ref 값은 그대로 쓴다.
+
+## 문서 대안 대상
+
+[문서 대안](document-variants.md)은 `plan variant`의 `documents` 경로→Markdown 입력으로 범위를 선언한다. `document read <name> --target <plan>/<variant>`로 core가 합친 문서를 읽고, 그 블록 순번·revision으로 `document edit <name> --target <plan>/<variant> --input <operations.json> --expect-revision <revision> --dry-run`을 실행한다. 범위 밖 편집은 거절한다. 과거 기준값은 core가 기록한다. 확정은 기존 `plan approve`만 사용한다.

@@ -107,7 +107,7 @@ pnpm package:vsix
 
 브라우저 개발: `pnpm --filter @vibe-spec/webview dev` 실행 후 표시된 주소를 엽니다. `?table=items`는 5,002행, `?table=offers`는 숫자와 참조 예시입니다. 테스트·개발 host는 VSIX에 포함되지 않습니다.
 
-패키지는 `artifacts/vibe-spec-0.7.1.vsix`에 생성되며 Git에서 제외됩니다. VS Code 1.140 이상에서 확장 화면의 `…` → **Install from VSIX…**로 설치합니다. 프로젝트 폴더를 연 뒤 왼쪽 vibe-spec에서 기획 폴더를 선택하거나 빈 폴더를 초기화하세요. 여러 workspace 폴더를 열었으면 설정을 저장할 폴더를 고릅니다. 그 폴더의 `.vibe-spec.json`에 기획 위치를 저장합니다.
+패키지는 `artifacts/vibe-spec-0.8.0.vsix`에 생성되며 Git에서 제외됩니다. VS Code 1.140 이상에서 확장 화면의 `…` → **Install from VSIX…**로 설치합니다. 프로젝트 폴더를 연 뒤 왼쪽 vibe-spec에서 기획 폴더를 선택하거나 빈 폴더를 초기화하세요. 여러 workspace 폴더를 열었으면 설정을 저장할 폴더를 고릅니다. 그 폴더의 `.vibe-spec.json`에 기획 위치를 저장합니다.
 
 칸 클릭으로 선택하고 타이핑으로 덮어쓰며 편집을 시작합니다. Enter·F2·더블클릭은 기존 값을 유지합니다. 편집 중 다른 칸을 클릭하면 수정값을 확정한 뒤 그 칸을 편집하며, 값이 그대로면 쓰기 없이 이동합니다. Enter는 확정 후 다음 행, Tab은 다음 열로 이동하고 Esc는 입력을 취소합니다. 반영 실패 시 이동하지 않고 입력과 이유를 표시합니다. 일반 검증 오류는 반영한 뒤 칸에 표시하지만 `1e` 같은 미완성 숫자는 core 판정에 따라 GUI draft로 유지합니다. 숫자는 텍스트 입력이며 참조는 Key 선택입니다. TSV 여러 칸 붙여넣기도 지원합니다.
 
