@@ -206,7 +206,7 @@ export function DocumentsApp({ host }: { host: DocumentsHost }) {
         {view.links.some(link => link.kind === 'resource') && <ul className="document-references" aria-label="연결된 기획 값">
           {view.links.filter(link => link.kind === 'resource').map((link, index) => <li key={index}>
             <button className="document-link" onClick={() => navigate(link.path || link.destination)}><code>{link.path || link.destination}</code>
-              {(link.path ? pathParts(link.path).length : 0) === 3 && !state.documents.some(item => item.name === pathParts(link.path!)[0])
+              {link.resolved && (link.path ? pathParts(link.path).length : 0) === 3 && !state.documents.some(item => item.name === pathParts(link.path!)[0])
                 && link.value !== undefined && (link.value === null || typeof link.value !== 'object') && <span className="document-value">{displayValue(link.value)}</span>}
               {link.resolved === false && <span>대상을 찾을 수 없습니다</span>}
             </button></li>)}

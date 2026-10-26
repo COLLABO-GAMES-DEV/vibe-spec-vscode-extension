@@ -144,3 +144,11 @@ it('distinguishes a slash heading from a hierarchy and leaves all legacy spellin
   const result = await saveDocumentSnapshots(p.root, p.revision, [{ name: 'guide', blocks: view.blocks.map(b => ({ original: b.index })) }]);
   expect(result.changed).toEqual([]); expect(result.project.sources.get('documents/guide.md')).toBe(source);
 });
+it('reports malformed escaped links while retaining them during unrelated Key renames', async () => {
+  let p = await fixture(); const source = '# 안내\n\n[깨진 주소](./offers/bundle~2/price)\n\n[기존](items/currency_gold/name)';
+  p = (await createDocument(p.root, p.revision, 'guide', source)).project;
+  expect(getDocumentView(p, 'guide').diagnostics).toContainEqual(expect.objectContaining({ code: 'DOCUMENT_LINK_MISSING' }));
+  p = (await renameResource(p.root, p.revision, 'key', 'items/currency_gold', 'coin/blue')).project;
+  expect(p.sources.get('documents/guide.md')).toBe(source.replace('items/currency_gold/name', './items/coin~1blue/name'));
+  expect(validateProject(p).map(d => d.code)).toEqual(['DOCUMENT_LINK_MISSING']);
+});

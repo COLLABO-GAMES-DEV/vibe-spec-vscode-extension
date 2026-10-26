@@ -1,3 +1,4 @@
+import { VibeError } from './types.js';
 import { pathParts, pathFromParts } from './paths.js';
 import { resourceEntries, resourceFile } from './resources.js';
 import { toString } from 'mdast-util-to-string';
@@ -83,6 +84,10 @@ export function rewriteMarkdownPaths(name: string, source: string, rename: (path
   const edits = new Map<string, { start: number; end: number; text: string }>();
   for (const link of parseMarkdown(name, source).links) {
     if (link.kind !== 'resource' || link.path === undefined) continue;
+    // Malformed destinations stay as source text and validation errors. An
+    // unrelated rename must neither reinterpret them nor fail because of them.
+    try { pathParts(link.path); }
+    catch (error) { if (!(error instanceof VibeError) || error.code !== 'PATH_INVALID') throw error; continue; }
     const next = rename(link.path);
     if (next === link.path) continue;
     const oldParts = pathParts(link.path), newParts = pathParts(next);

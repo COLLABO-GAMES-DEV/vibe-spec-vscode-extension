@@ -48,3 +48,11 @@ test('renders raw slash Keys, edits them, follows cell references and marks inva
   await page.getByRole('button', { name: '행 사용처 보기', exact: true }).click();
   await expect(page.getByRole('region', { name: '선언된 참조', exact: true }).getByRole('button', { name: /기획 문서/ })).toBeVisible();
 });
+test('keeps the editor visible and reports a malformed escaped link without rendering an exception', async ({ page, request }) => {
+  const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
+  await request.post('/__vibe/documents/fixture', { data: { source: '# 안내\n\n[깨진 주소](./offers/bundle~2/price)\n\n보존할 내용' } });
+  await page.goto('/?mode=documents&document=' + encodeURIComponent(name));
+  await expect(page.getByTestId('document-rich-editor')).toContainText('보존할 내용');
+  await expect(page.getByRole('region', { name: '문서 진단' })).toContainText('DOCUMENT_LINK_MISSING');
+  expect(errors).toEqual([]);
+});
