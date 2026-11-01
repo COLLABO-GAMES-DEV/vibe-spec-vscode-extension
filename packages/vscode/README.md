@@ -56,9 +56,9 @@ gh auth setup-git
 
 인증이나 전송이 실패해도 이미 만든 로컬 커밋은 유지됩니다.
 
-## CLI와 Codex에서 읽고 수정하기
+## CLI와 Codex·Claude Code에서 읽고 수정하기
 
-확장에는 CLI 파일 `dist/vibe.cjs`가 포함되어 있습니다. 새 기획 폴더의 `AGENTS.md`에 CLI 찾기, 읽기·편집·검증 절차가 안내됩니다. `code` 명령이 PATH에 있는 터미널에서 설치 위치를 찾고 Node.js로 실행할 수 있습니다.
+확장에는 CLI 파일 `dist/vibe.cjs`가 포함되어 있습니다. 새 기획 폴더의 `AGENTS.md`에 CLI 찾기, 읽기·편집·검증 절차와 열 타입·옵션이 안내됩니다. Claude Code는 함께 생성되는 `CLAUDE.md`(`@AGENTS.md` 가져오기)와 `.claude/skills/vibe-import`로 같은 안내를 읽습니다. `code` 명령이 PATH에 있는 터미널에서 설치 위치를 찾고 Node.js로 실행할 수 있습니다.
 
 Windows PowerShell:
 

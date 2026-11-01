@@ -151,7 +151,7 @@ afterEach(async () => {
 describe('Git through actual CLI processes and two clones', { timeout: process.platform === 'win32' ? 120_000 : 60_000 }, () => {
   it.each([false, true])('keeps source bytes and revisions identical across local clones with autocrlf=%s', async autocrlf => {
     const { directory, first, second } = await setup(false, autocrlf);
-    const managed = ['.agents/skills/vibe-import/SKILL.md', '.gitattributes', '.gitignore', '.vibe-spec.json', 'AGENTS.md',
+    const managed = ['.agents/skills/vibe-import/SKILL.md', '.claude/skills/vibe-import/SKILL.md', '.gitattributes', '.gitignore', '.vibe-spec.json', 'AGENTS.md', 'CLAUDE.md',
       'schemas/items.yaml', 'schemas/offers.yaml', 'tables/items.yaml', 'tables/offers.yaml'];
     expect(git(second, ['ls-files', '--', '.gitattributes'])).toBe('.gitattributes');
     for (const file of managed) {

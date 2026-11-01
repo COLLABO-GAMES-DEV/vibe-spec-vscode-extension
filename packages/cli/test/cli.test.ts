@@ -59,7 +59,7 @@ describe('actual CLI processes', () => {
     expect(await realpath(initializedRoot)).toBe(await realpath(root));
     expect(reply.revision).toMatch(/^[a-f0-9]{64}$/);
     expect((await readdir(root)).sort()).toEqual([
-      '.agents', '.gitattributes', '.gitignore', '.vibe-spec.json', 'AGENTS.md', 'schemas', 'tables',
+      '.agents', '.claude', '.gitattributes', '.gitignore', '.vibe-spec.json', 'AGENTS.md', 'CLAUDE.md', 'schemas', 'tables',
     ]);
     expect(JSON.parse(await readFile(join(root, '.vibe-spec.json'), 'utf8')))
       .toEqual({ planning_root: '.' });

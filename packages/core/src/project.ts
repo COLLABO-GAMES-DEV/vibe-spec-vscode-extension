@@ -9,8 +9,7 @@ import { formatYaml, parseYaml } from './yaml.js';
 import { tableContexts, validateProject } from './validation.js';
 import { resourceNameError, resourceNameKey, suggestResourceName } from './names.js';
 import { resourceEntry, resourceFile, folderError } from './resources.js';
-import { planningAgentInstructions } from './agents.js';
-import { planningImportSkill } from './import-skill.js';
+import { agentFiles } from './agents.js';
 import { readDocumentPath } from './documents.js';
 import { removeEmptyDirectory, replaceFile, temporarySibling } from './file-replacement.js';
 
@@ -428,8 +427,9 @@ export async function initProject(folder: string): Promise<Project> {
   await writeFile(join(root, '.vibe-spec.json'), '{"planning_root":"."}\n', { flag: 'wx' });
   await writeFile(join(root, '.gitignore'), '.vibe-spec.lock\n*.vibe-tmp\n', { flag: 'wx' });
   await writeFile(join(root, '.gitattributes'), '* text=auto eol=lf\ndocuments/*.md -text\ndocuments/**/*.md -text\ndocuments/assets/* -text\n', { flag: 'wx' });
-  await writeFile(join(root, 'AGENTS.md'), planningAgentInstructions, { flag: 'wx' });
-  await mkdir(join(root, '.agents/skills/vibe-import'), { recursive: true });
-  await writeFile(join(root, '.agents/skills/vibe-import/SKILL.md'), planningImportSkill, { flag: 'wx' });
+  for (const [path, text] of agentFiles) {
+    await mkdir(dirname(join(root, path)), { recursive: true });
+    await writeFile(join(root, path), text, { flag: 'wx' });
+  }
   return loadProject(root);
 }

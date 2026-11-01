@@ -65,7 +65,7 @@ async function input(runner: Runner, directory: string, value: unknown) {
   return path;
 }
 async function sources(root: string): Promise<Record<string, string>> {
-  const files = ['.agents/skills/vibe-import/SKILL.md', '.gitattributes', '.gitignore', '.vibe-spec.json', 'AGENTS.md'];
+  const files = ['.agents/skills/vibe-import/SKILL.md', '.claude/skills/vibe-import/SKILL.md', '.gitattributes', '.gitignore', '.vibe-spec.json', 'AGENTS.md', 'CLAUDE.md'];
   for (const directory of ['schemas', 'tables']) {
     files.push(...(await readdir(join(root, directory))).sort().map(name => directory + '/' + name));
   }

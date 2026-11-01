@@ -6,7 +6,7 @@ description: CSV·TSV·XLSX와 Notion 내보내기 ZIP을 조사하고 구조·K
 # 기획 불러오기
 
 기획 루트의 AGENTS.md와 이 문서를 읽고 설치된 vibe CLI를 사용한다.
-이 문서의 위치는 기획 루트의 .agents/skills/vibe-import/SKILL.md다. Claude 등에서도 이 파일을 명시적으로 읽게 할 수 있다.
+이 문서의 위치는 기획 루트의 .agents/skills/vibe-import/SKILL.md다. Claude Code는 .claude/skills/vibe-import/SKILL.md를 거쳐 이 파일을 읽는다.
 원문을 옮기는 권한과 기획 내용을 확정하는 판단을 구분한다. 원문 자체를 승인된 기획으로 간주하지 않는다.
 조사 → 구조·Key·타입 제안 → 필요한 질문·결정 기록 → dry-run → 적용 → 검증 → 출처 보고 순서로 진행한다.
 

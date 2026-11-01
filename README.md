@@ -41,7 +41,7 @@ pnpm --silent vibe fmt --project /tmp/my-planning --check --json
 pnpm --silent vibe fmt --project /tmp/my-planning --json
 ```
 
-`init`는 빈 폴더에 `schemas/`, `tables/`, `.vibe-spec.json`, `.gitignore`, `.gitattributes`, `AGENTS.md`를 만듭니다. 기존 `.git`만 있는 폴더도 허용합니다. 테이블은 화면이나 `edit`로 스키마와 함께 만들 수 있습니다. `--project`를 생략하면 현재 폴더부터 상위의 `.vibe-spec.json`을 찾습니다.
+`init`는 빈 폴더에 `schemas/`, `tables/`, `.vibe-spec.json`, `.gitignore`, `.gitattributes`, `AGENTS.md`와 에이전트 스킬을 만듭니다. Claude Code용 `CLAUDE.md`와 `.claude/skills/`도 만들며, 이 파일들은 `AGENTS.md`와 `.agents/skills/`를 가리키기만 합니다. 기존 `.git`만 있는 폴더도 허용합니다. 테이블은 화면이나 `edit`로 스키마와 함께 만들 수 있습니다. `--project`를 생략하면 현재 폴더부터 상위의 `.vibe-spec.json`을 찾습니다.
 
 JSON 출력은 `{ok, revision, data, diagnostics}`이며 작업 오류에는 `error: {code, message}`가 붙습니다. 숫자 값은 문자열입니다. 종료 코드는 성공 `0`, 검증 오류 또는 `fmt --check`의 변경 필요 `1`, 잘못된 요청·I/O 실패 `2`입니다. `fmt`의 `data.changed`는 변경된 파일 목록이며, 검증 오류가 남아 있으면 이미 포맷을 적용했어도 종료 코드가 `1`일 수 있습니다.
 
@@ -119,7 +119,7 @@ pnpm package:vsix
 
 ## 에이전트와 배포
 
-VSIX에는 같은 CLI를 번들한 `dist/vibe.cjs`가 들어 있습니다. Node.js 24 이상에서 실행하며, 새 기획 폴더의 AGENTS.md에 Windows PowerShell과 macOS/Linux의 설치 위치 탐색·JSON 입력 예시·revision·종료 코드 규칙이 있습니다. 기존 기획 폴더의 안내 파일은 자동으로 덮어쓰지 않습니다.
+VSIX에는 같은 CLI를 번들한 `dist/vibe.cjs`가 들어 있습니다. Node.js 24 이상에서 실행하며, 새 기획 폴더의 AGENTS.md에 Windows PowerShell과 macOS/Linux의 설치 위치 탐색·JSON 입력 예시·revision·종료 코드 규칙이 있습니다. AGENTS.md에는 새 테이블을 만들 때 쓰는 열 타입·옵션 표도 있습니다. Claude Code는 `CLAUDE.md`의 `@AGENTS.md` 가져오기로 같은 안내를 읽습니다. 기존 기획 폴더의 안내 파일은 자동으로 덮어쓰지 않습니다.
 
 수동 수용 검사: `node scripts/codex-acceptance.mjs --cli-entry packages/vscode/dist/vibe.cjs`. [실행과 판정 기준](docs/codex-acceptance.md)에 따라 실제 `codex exec`를 사용하고 원본 데모를 보존합니다. 일반 PR CI에는 연결하지 않습니다.
 
