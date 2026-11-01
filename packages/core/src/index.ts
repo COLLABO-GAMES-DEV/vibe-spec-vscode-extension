@@ -12,6 +12,8 @@ export { tableSummaries } from './view.js';
 export { assertCompleteCellInputs } from './input.js';
 export type { CellAddress, HistoryInfo } from './types.js';
 export { ScreenHistory } from './history.js';
+export { applyTableWrite, assertTableColumnOperation, parseTableWrite } from './table-writes.js';
+export type { TableWrite } from './table-writes.js';
 export type { ImportIssue, ImportCell, ImportSheet, ImportInspection, ImportMapping, ImportPlan } from './import-types.js';
 export { inspectImport, planImport, applyImport } from './import.js';
 export type { GitConflict, GitChoice, GitStatus, GitResult } from './git-types.js';

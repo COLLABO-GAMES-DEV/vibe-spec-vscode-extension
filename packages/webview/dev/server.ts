@@ -5,11 +5,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  applyEdits, assertCompleteCellInputs, getTableView, loadProject, renameResource, VibeError,
+  applyEdits, applyTableWrite, assertTableColumnOperation, parseTableWrite, getTableView, loadProject, VibeError,
   resolveReference, ScreenHistory, whereUsed,
-  inspectStructure, applyStructureEdit, deletionUsages, applyFolderEdit, createDocument, addDocumentImage, resourceEntries,
+  inspectStructure, deletionUsages, applyFolderEdit, createDocument, addDocumentImage, resourceEntries,
 } from '@vibe-spec/core';
-import type { EditOperation, StructureOperation, Usages } from '@vibe-spec/core';
+import type { StructureOperation, Usages } from '@vibe-spec/core';
 import type { Plugin } from 'vite';
 import { createImportServer } from './importServer.js';
 import { createGitServer } from './gitServer.js';
@@ -93,6 +93,7 @@ export function fakeHostServer(): Plugin {
             history: histories.get(client + '/' + name)?.info() ?? { canUndo: false, canRedo: false } });
           if (url.pathname === '/__vibe/action') {
             if (body.type === 'structurePreview') {
+              assertTableColumnOperation(table, body.operation as StructureOperation);
               const preview = await inspectStructure(project, body.operation as StructureOperation);
               usageResults.set(screen, preview.usages);
               response.end(JSON.stringify({ type: 'structurePreview', preview })); return;
@@ -115,21 +116,10 @@ export function fakeHostServer(): Plugin {
             response.end(JSON.stringify({ type: 'navigate', snapshot: view(target.table), focus: { type: 'focus', ...target } })); return;
           }
           if (url.pathname === '/__vibe/apply') {
-            let result;
-            if (body.type === 'undo' || body.type === 'redo') result = await history[body.type](root, String(body.revision));
-            else if (body.type === 'structureEdit') {
-              result = await applyStructureEdit(root, String(body.revision), body.operation as StructureOperation); history.recordStructure(result);
-            } else if (body.type === 'columnRename') {
-              result = await renameResource(root, String(body.revision), 'column', table + '/*/' + String(body.column), String(body.to)); history.recordStructure(result);
-            } else if (body.type === 'rename') {
-              result = await renameResource(root, String(body.revision), 'key', pathFromParts([table, String(body.key)]), String(body.to));
-              history.recordRename(result, table, String(body.key), String(body.to));
-            } else {
-              assertCompleteCellInputs(project, body.operations as EditOperation[]);
-              result = await applyEdits(root, String(body.revision), body.operations as EditOperation[]);
-              history.recordCells(result, body.operations as EditOperation[]);
-            }
-            project = result.project;
+            // Same validation and history recording as the VS Code host.
+            const write = parseTableWrite(body);
+            if (!write) throw new VibeError('INVALID_EDIT', 'Unknown table write: ' + String(body.type));
+            project = (await applyTableWrite(project, table, history, write)).project;
           } else if (url.pathname === '/__vibe/external') {
             project = (await applyEdits(root, project.revision, [{
               op: 'update', table, key: String(body.key), values: body.values as Record<string, string | boolean | null>,

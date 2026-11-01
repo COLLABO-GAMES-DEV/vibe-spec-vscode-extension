@@ -10,10 +10,10 @@ import { GitController } from './gitController.js';
 import { TablesController } from './tablesController.js';
 import { PlansController } from './plansController.js';
 import {
-  applyEdits, compareResourceNames, assertCompleteCellInputs, getTableView, initProject, listTables, loadProject, renameResource,
+  applyTableWrite, assertTableColumnOperation, compareResourceNames, getTableView, initProject, listTables, loadProject,
   resolveProjectRoot, selectPlanningRoot, validateProject, VibeError,
   resolveReference, ScreenHistory, whereUsed, resourceEntry, resourceFile,
-  inspectStructure, applyStructureEdit, deletionUsages, exportMarkdown,
+  inspectStructure, deletionUsages, exportMarkdown,
 } from '@vibe-spec/core';
 import type { Diagnostic, Project, Usages } from '@vibe-spec/core';
 import type { ClientMessage, HostMessage } from '../../webview/src/protocol.js';
@@ -228,28 +228,12 @@ export async function activate(context: vscode.ExtensionContext) {
           return;
         }
         if (message.type === 'structurePreview') {
-          if (message.operation.table !== table || !message.operation.op.startsWith('column-')) throw new VibeError('INVALID_EDIT', '현재 표의 열을 선택해 주세요.');
+          assertTableColumnOperation(table, message.operation);
           const preview = await inspectStructure(await loadProject(panelRoot), message.operation);
           usages.set(table, preview.usages); post(panel, { type: 'structurePreview', preview }); return;
         }
         if (typeof message.requestId !== 'string' || typeof message.revision !== 'string') return;
-        if (message.type === 'apply' && (!Array.isArray(message.operations) || message.operations.some(op => op.table !== table))) {
-          throw new VibeError('INVALID_EDIT', '현재 표의 칸만 편집할 수 있습니다.');
-        }
-        if (message.type === 'apply') assertCompleteCellInputs(project, message.operations);
-        let result;
-        if (message.type === 'apply') {
-          result = await applyEdits(panelRoot, message.revision, message.operations);
-          history.recordCells(result, message.operations);
-        } else if (message.type === 'rename') {
-          result = await renameResource(panelRoot, message.revision, 'key', pathFromParts([table, message.key]), message.to);
-          history.recordRename(result, table, message.key, message.to);
-        } else if (message.type === 'structureEdit') {
-          if (message.operation.table !== table || !message.operation.op.startsWith('column-')) throw new VibeError('INVALID_EDIT', '현재 표의 열을 선택해 주세요.');
-          result = await applyStructureEdit(panelRoot, message.revision, message.operation); history.recordStructure(result);
-        } else if (message.type === 'columnRename') {
-          result = await renameResource(panelRoot, message.revision, 'column', table + '/*/' + message.column, message.to); history.recordStructure(result);
-        } else result = await history[message.type](panelRoot, message.revision);
+        const result = await applyTableWrite(project, table, history, message);
         if (planningRoot !== panelRoot) return;
         project = result.project;
         snapshot(table, panel, message.requestId);
