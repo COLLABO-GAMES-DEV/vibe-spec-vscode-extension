@@ -11,7 +11,7 @@ import { applyEdits } from './editing.js';
 import { mutateProject } from './project.js';
 import { schemaDiagnostics, tableContexts } from './validation.js';
 import { whereUsed } from './usage.js';
-import { formatYaml, parseYaml } from './yaml.js';
+import { formatYaml, formattedNode, parseYaml } from './yaml.js';
 
 const name = { type: 'string', minLength: 1, pattern: '^[^/]+$' };
 const position = { type: 'object', required: ['anchor', 'side'], additionalProperties: false,
@@ -131,7 +131,7 @@ async function prepare(project: Project, operation: StructureOperation) {
       const edited = { ...schemaFile, document: schemaFile.document.clone() };
       if (operation.op === 'column-add') {
         checkedSchema(schemaFile, { ...target.schema, columns: { ...target.schema.columns, [column]: operation.definition } });
-        edited.document.setIn(['columns', column], edited.document.createNode(operation.definition));
+        edited.document.setIn(['columns', column], formattedNode(edited.document, operation.definition));
         if (operation.position) moveColumn(edited.document, column, operation.position);
       } else if (operation.op === 'column-update') {
         const definition: Column = { ...target.schema.columns[column]!, ...operation.changes };
@@ -148,7 +148,11 @@ async function prepare(project: Project, operation: StructureOperation) {
           for (const field of Object.keys(target.schema.columns[column]!)) {
             if (!Object.hasOwn(definition, field)) edited.document.deleteIn(['columns', column, field]);
           }
-          for (const [field, value] of Object.entries(definition)) edited.document.setIn(['columns', column, field], value);
+          for (const [field, value] of Object.entries(definition)) {
+            if (!isDeepStrictEqual(value, target.schema.columns[column]![field as keyof Column])) {
+              edited.document.setIn(['columns', column, field], formattedNode(edited.document, value));
+            }
+          }
         }
       } else if (operation.op === 'column-move') {
         moveColumn(edited.document, column, operation.position);

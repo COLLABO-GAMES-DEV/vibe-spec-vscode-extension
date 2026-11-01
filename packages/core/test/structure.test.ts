@@ -5,7 +5,8 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 import { isMap, isScalar } from 'yaml';
 import { applyStructureEdit, editProject, inspectStructure } from '../src/structure.js';
-import { loadProject, readPath } from '../src/project.js';
+import { applyEdits, renameResource } from '../src/editing.js';
+import { formattedSources, initProject, loadProject, readPath } from '../src/project.js';
 import type { Project, TableSchema } from '../src/types.js';
 import type { StructureOperation } from '../src/structure-types.js';
 
@@ -49,6 +50,27 @@ describe('column structure edits', () => {
     expect(order(result.project)).toEqual(['code', 'name', 'rank_2', 'kind', 'note']);
     expect(result.diagnostics.filter(item => item.code === 'VALUE_REQUIRED')).toHaveLength(4);
     for (const table of ['items', 'other']) expect(result.project.sources.get('tables/' + table + '.yaml')).toBe(project.sources.get('tables/' + table + '.yaml'));
+  });
+
+  it('leaves schemas fmt-clean after table-create, column-add and column-update', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'vibe-structure-fmt-'));
+    roots.push(root);
+    let project = await initProject(join(root, 'p'));
+    const operations: StructureOperation[] = [
+      { op: 'table-create', table: 'items', key: { code: 'code', label: '코드' } },
+      { op: 'column-add', table: 'items', column: 'kind', definition: { type: 'enum', label: '종류', values: ['a', 'b'], nullable: true } },
+      { op: 'column-add', table: 'items', column: 'price', definition: { type: 'decimal', label: '가격', minimum: '0' } },
+      { op: 'column-update', table: 'items', column: 'kind', changes: { label: '분류', values: ['a', 'b', 'c'] } },
+    ];
+    for (const operation of operations) {
+      project = (await applyStructureEdit(project.root, project.revision, operation)).project;
+      expect(formattedSources(project).get('schemas/items.yaml')).toBe(project.sources.get('schemas/items.yaml'));
+    }
+    expect(project.sources.get('schemas/items.yaml')).toContain('label: "분류"');
+    project = await applyEdits(project.root, project.revision, [{ op: 'create', table: 'items', row: { code: 'gem', kind: 'a' } }]).then(result => result.project);
+    project = (await renameResource(project.root, project.revision, 'column', 'items/*/kind', 'category')).project;
+    expect(project.sources.get('schemas/items.yaml')).toContain('\n  category:\n');
+    for (const [file, text] of formattedSources(project)) expect(text, file).toBe(project.sources.get(file));
   });
 
   it('keeps all data bytes through required, label and type changes and cleans obsolete type options', async () => {

@@ -13,6 +13,7 @@ import { parseYaml } from './yaml.js';
 import { replaceFile as replaceTemporaryFile, temporarySibling } from './file-replacement.js';
 import { resourceEntry } from './resources.js';
 import { resourceNameKey } from './names.js';
+import { agentFiles } from './agents.js';
 
 interface GitOutput { stdout: Buffer; stderr: string; code: number }
 async function nativeGit(cwd: string, args: string[], network = false): Promise<GitOutput> {
@@ -56,7 +57,7 @@ async function optional(cwd: string, args: string[]): Promise<string | null> {
   throw gitError(result, 'git ' + args[0]);
 }
 const split0 = (text: string) => text.split('\0').filter(Boolean);
-const managedRootFiles = ['AGENTS.md', '.gitattributes', '.gitignore', '.vibe-spec.json', '.agents/skills/vibe-import/SKILL.md'];
+const managedRootFiles = ['.gitattributes', '.gitignore', '.vibe-spec.json', ...agentFiles.map(([path]) => path)];
 const managedPath = (path: string) => resourceEntry(path) !== undefined || /^plans\/[^/]+\/[^/]+\.yaml$/.test(path) ||
   /^(?:schemas|tables|documents)\/(?:[^/]+\/)*\.gitkeep$/.test(path) && !path.startsWith('documents/assets/') ||
   /^documents\/assets\/[^/]+\.(png|jpe?g|gif|webp)$/i.test(path) || /^imports\/[a-f0-9]{64}\.json$/.test(path) || managedRootFiles.includes(path);

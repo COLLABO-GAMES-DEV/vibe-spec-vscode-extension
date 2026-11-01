@@ -101,7 +101,7 @@ describe('native Git status and save scope', () => {
     const root = await project();
     const before = await getGitStatus(root);
     expect(before).toMatchObject({ repository: null, gitDir: null, branch: null, state: 'unsaved', mergeInProgress: false });
-    expect(before.changes).toEqual(['.agents/skills/vibe-import/SKILL.md', '.gitattributes', '.gitignore', '.vibe-spec.json', 'AGENTS.md', 'schemas/items.yaml', 'tables/items.yaml']);
+    expect(before.changes).toEqual(['.agents/skills/vibe-import/SKILL.md', '.claude/skills/vibe-import/SKILL.md', '.gitattributes', '.gitignore', '.vibe-spec.json', 'AGENTS.md', 'CLAUDE.md', 'schemas/items.yaml', 'tables/items.yaml']);
     await expect(saveProject(root, ' \n ', before.revision)).rejects.toMatchObject({ code: 'GIT_REASON_REQUIRED' });
     expect((await getGitStatus(root)).repository).toBeNull();
     const saved = await saveProject(root, '첫 저장', before.revision);
@@ -216,7 +216,7 @@ describe('native Git status and save scope', () => {
     expect(saved.status.outgoing[0]?.otherFiles).toBe(false);
     const clone = join(sandbox, 'LF clone 한글');
     git(sandbox, 'clone', root, clone);
-    for (const path of ['.gitattributes', '.gitignore', '.vibe-spec.json', 'AGENTS.md', 'schemas/items.yaml', 'tables/items.yaml']) {
+    for (const path of ['.gitattributes', '.gitignore', '.vibe-spec.json', 'AGENTS.md', 'CLAUDE.md', '.claude/skills/vibe-import/SKILL.md', 'schemas/items.yaml', 'tables/items.yaml']) {
       expect(await readFile(join(clone, path), 'utf8')).not.toContain('\r');
     }
     expect((await getGitStatus(clone)).changes).toEqual([]);

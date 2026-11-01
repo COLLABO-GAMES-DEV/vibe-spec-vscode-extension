@@ -1,4 +1,5 @@
 import { isAlias, isMap, isScalar, isSeq, parseDocument, visit } from 'yaml';
+import type { Document, Node, visitor } from 'yaml';
 import { VibeError, isRecord } from './types.js';
 import type { Cell, Diagnostic, TableSchema, YamlFile } from './types.js';
 
@@ -56,14 +57,29 @@ export function updateCell(
   return parseYaml(file.source.slice(0, start) + JSON.stringify(value) + file.source.slice(end), file.file);
 }
 
+const formatStyle: visitor = (key, node) => {
+  if (isMap(node) || isSeq(node)) node.flow = false;
+  if (isScalar(node) && typeof node.value === 'string') {
+    node.type = key === 'key' ? 'PLAIN' : 'QUOTE_DOUBLE';
+  }
+};
+
+/** Creates a node already in fmt style, so structure edits leave files fmt-clean without rewriting other bytes. */
+export function formattedNode(document: Document, value: unknown): Node {
+  const node = document.createNode(value);
+  visit(node, formatStyle);
+  return node;
+}
+
+/** The text fmt writes for a mapping key, for byte-level edits that must stay fmt-clean. */
+export function formattedKey(key: string): string {
+  const source = formatYaml(parseYaml(JSON.stringify({ [key]: null }))).source;
+  return source.slice(0, source.lastIndexOf(': null'));
+}
+
 export function formatYaml(file: YamlFile, _schema?: TableSchema): YamlFile {
   const document = file.document.clone();
-  visit(document, (key, node) => {
-    if (isMap(node) || isSeq(node)) node.flow = false;
-    if (isScalar(node) && typeof node.value === 'string') {
-      node.type = key === 'key' ? 'PLAIN' : 'QUOTE_DOUBLE';
-    }
-  });
+  visit(document, formatStyle);
   return parseYaml(document.toString({
     indent: 2, lineWidth: 0, blockQuote: false, doubleQuotedAsJSON: true,
   }).replace(/\r\n/g, '\n'), file.file);

@@ -98,8 +98,7 @@ try {
     documents: { '상점 안내/상점 안내/스타터 팩': '## 스타터 팩\n\nB안: 가격을 99 보석으로 낮추고 큰 회복약 상위 상품을 추가합니다.' },
   }));
 
-  vibe('fmt', '--project', folder); // column-add output is valid but not fmt-normalized
-  vibe('fmt', '--check', '--project', folder);
+  vibe('fmt', '--check', '--project', folder); // every write above must already be fmt-clean
   const validation = vibe('validate', '--project', folder);
   console.log('Synthetic planning folder ready: ' + folder);
   console.log('revision ' + validation.revision + ', diagnostics ' + validation.diagnostics.length);

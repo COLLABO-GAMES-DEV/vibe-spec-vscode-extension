@@ -1,6 +1,10 @@
+import { planningImportSkill } from './import-skill.js';
+
 export const planningAgentInstructions = `# 기획 폴더 작업 안내
 
 이 폴더의 YAML과 \`documents/**/*.md\`가 원본이다. 읽기·편집·검증은 vibe CLI로 한다. GUI와 같은 core가 규칙을 검사한다.
+
+에이전트 안내의 원본은 이 파일과 \`.agents/skills/\`다. Claude Code용 \`CLAUDE.md\`와 \`.claude/skills/\`는 이 원본을 가리키기만 한다. 규칙을 바꿀 때는 원본만 고친다.
 
 기존 시트나 Notion 내보내기를 옮길 때는 [vibe-import 스킬](.agents/skills/vibe-import/SKILL.md)을 읽는다. 원본 조사는 \`vibe source inspect <file> --json\`, 쓰기 미리보기는 \`edit/apply --dry-run\`과 \`plan create/variant/status/approve --dry-run\`이다. 이미 승인된 단순 표는 기존 import plan/apply를 써도 된다. 원본끼리 다른 값과 새 해석이 필요한 부분은 사람이 결정할 목록으로 남긴다.
 
@@ -75,13 +79,44 @@ vibe where-used items/currency_coin --json
 
 rename은 key·table·column·schema·document·heading·tag 이름을 바꾸고 선언된 참조와 Markdown 링크 목적지를 함께 고친다. Key를 일반 update로 바꾸지 않는다. rename이 반환하는 본문 candidates는 자동 수정되지 않았으므로 사람에게 보고한다. where-used는 필요할 때 조회하는 기능이며 사전 실행 의무는 없다.
 
-새 테이블: \`{"op":"table-create","table":"rewards","key":{"code":"key","label":"Key"}}\`.
-열 추가: \`{"op":"column-add","table":"rewards","column":"amount","definition":{"type":"decimal","label":"수량"}}\`.
-이 객체들도 edit에 전달한다. import는 inspect → plan → apply 순서로 원문과 매핑을 확인하고 사용한다. 이번 요청에 없는 구조·도메인 규칙을 만들지 않는다.
+import는 inspect → plan → apply 순서로 원문과 매핑을 확인하고 사용한다.
+
+## 테이블 구조와 열 타입
+
+빈 폴더에서 시작하면 먼저 테이블을 만든다. 테이블·Key 열·열 코드명·표시명·타입·옵션은 사람이 정한 범위만 만든다. 요청에 빠진 구조는 추측해 만들지 말고 위 항목으로 제안 목록을 보고한 뒤 승인을 받는다. 이번 요청에 없는 구조·도메인 규칙을 만들지 않는다.
+
+구조 변경도 edit에 객체 하나씩 전달하며, 먼저 --dry-run으로 확인한다. 한 줄이 요청 하나다.
+
+\`\`\`text
+{"op":"table-create","table":"rewards","folder":"경제","key":{"code":"code","label":"코드"}}
+{"op":"column-add","table":"rewards","column":"amount","definition":{"type":"decimal","label":"수량","minimum":"0"}}
+{"op":"column-add","table":"rewards","column":"item","definition":{"type":"ref","table":"items","label":"아이템","required":true,"on_delete":"restrict"},"position":{"anchor":"code","side":"after"}}
+{"op":"column-update","table":"rewards","column":"amount","changes":{"label":"지급 수량","required":true}}
+{"op":"column-move","table":"rewards","column":"amount","position":{"anchor":"item","side":"before"}}
+{"op":"column-delete","table":"rewards","column":"amount"}
+{"op":"table-delete","table":"rewards"}
+\`\`\`
+
+| type | 칸 값 | 전용 옵션 |
+| --- | --- | --- |
+| \`string\` | 한 줄 문자열 | 없음 |
+| \`text\` | 여러 줄 문자열 | 없음 |
+| \`integer\` | \`"12"\` 같은 정수 문자열 | \`minimum\`, \`maximum\`(문자열) |
+| \`decimal\` | \`"2500.50"\` 같은 숫자 문자열 | \`minimum\`, \`maximum\`(문자열) |
+| \`boolean\` | JSON \`true\`/\`false\` | 없음 |
+| \`enum\` | \`values\` 중 하나 | \`values\`(필수, 중복 없는 문자열 배열) |
+| \`ref\` | 대상 테이블의 Key만 | \`table\`(필수), \`on_delete: "restrict"\`(선택) |
+
+- 모든 타입의 공통 옵션은 \`label\`(표시명), \`required\`(값 누락 진단), \`nullable\`(null 허용, 기본은 거부)이다. 다른 필드는 거절된다.
+- 열 코드명과 Key 코드는 영문 소문자·숫자·_만 쓴다. 표시명은 자유롭게 쓴다. table-create는 \`string\` Key 열 하나와 \`schemas/<테이블>.yaml\`을 만든다. Key 열은 string·text·integer만 가능하고 항상 필수·non-null이다.
+- \`on_delete: "restrict"\`는 참조 중인 행의 삭제를 막는다. 없으면 삭제가 반영되고 남은 참조는 REF_MISSING으로 진단된다.
+- column-update로 type을 바꾸면 새 타입에 없는 옵션은 지워지고, 맞지 않는 기존 값은 바꾸지 않고 진단한다. required 열을 추가하면 기존 행마다 VALUE_REQUIRED가 나오므로 값은 apply로 채운다.
+- 여러 열 조합의 유일 제약(unique)은 CLI로 만들 수 없다. 필요하면 사람에게 보고한다.
+- 모든 CLI 쓰기 결과는 fmt 형식이다. 쓰기 뒤 \`vibe fmt --check --json\`이 실패하면 CLI 밖에서 파일이 바뀐 것이므로 원인을 보고한다.
 
 ## 문서와 블록 편집
 
-\`document list\`로 목록을, \`document read <name>\`으로 정확한 source와 블록·링크·revision을 읽는다. \`read 문서/제목/하위제목\`과 문단 바로 앞의 \`<!-- name: 이름표 -->\` 경로도 사용할 수 있다. 문서 이름만으로 전체 문서를 가리킨다. Markdown 링크의 목적지는 \`[가격](offers/bundle/price)\`처럼 기획 경로를 쓰며 공백이 있으면 \`[획득](<economy/재화 획득>)\`처럼 감싼다.
+\`document list\`로 목록을, \`document read <name>\`으로 정확한 source와 블록·링크·revision을 읽는다. 제목 주소는 문서 이름 뒤에 H1부터 모든 상위 제목을 잇는다. 문서 이름과 H1이 같아도 생략하지 않는다. 예: 문서 \`상점 안내\`의 \`# 상점 안내\` 아래 \`## 스타터 팩\`은 \`상점 안내/상점 안내/스타터 팩\`이다. 주소는 document read가 반환한 값을 그대로 쓴다. \`read 문서/제목/하위제목\`과 문단 바로 앞의 \`<!-- name: 이름표 -->\` 경로도 사용할 수 있다. 문서 이름만으로 전체 문서를 가리킨다. Markdown 링크의 목적지는 \`[가격](offers/bundle/price)\`처럼 기획 경로를 쓰며 공백이 있으면 \`[획득](<economy/재화 획득>)\`처럼 감싼다.
 
 \`\`\`sh
 vibe document list --json
@@ -165,3 +200,32 @@ A/B는 모두 기존 기준안 위의 대등한 변경분이다. \`read --target
 
 apply JSON의 key와 ref 칸, rename --to 같은 새 이름 인자에는 이스케이프하지 않은 원문을 넣는다. Markdown 링크 목적지는 <...>로 감싸고 원문 %는 %25로 URI 인코딩한다. 전체 주소를 URI 디코딩해 구분자와 이름을 혼동하지 않는다. 폴더도 ./공격~1방어 형태로 만들고 CLI로 이동한다. 실제 디렉터리명과 .gitkeep의 원래 이름 기록을 수동으로 편집하지 않는다. 파일명인 테이블·스키마·문서의 Windows 안전 규칙은 유지한다.
 `;
+
+const importSkillDescription = /^description: (.+)$/m.exec(planningImportSkill)![1]!;
+
+/** Claude Code reads CLAUDE.md and expands the @AGENTS.md import, so the rules live in one file. */
+export const claudeInstructions = `# Claude Code 안내
+
+이 기획 폴더의 작업 규칙은 AGENTS.md 한 곳에 있다. 아래 가져오기로 그 내용을 읽고 그대로 따른다. 이 파일에 규칙을 따로 적지 않는다.
+
+@AGENTS.md
+`;
+
+/** Claude Code discovers skills under .claude/skills; this entry defers to the shared skill. */
+export const claudeImportSkill = `---
+name: vibe-import
+description: ${importSkillDescription}
+---
+
+# 기획 불러오기
+
+이 스킬의 원본은 기획 루트의 \`.agents/skills/vibe-import/SKILL.md\`다. 먼저 기획 루트의 \`AGENTS.md\`와 그 파일을 읽고 그 절차를 그대로 따른다. 이 파일에 절차를 따로 적지 않는다.
+`;
+
+/** Agent instruction files written by init, relative to the planning root. */
+export const agentFiles: readonly (readonly [path: string, text: string])[] = [
+  ['AGENTS.md', planningAgentInstructions],
+  ['.agents/skills/vibe-import/SKILL.md', planningImportSkill],
+  ['CLAUDE.md', claudeInstructions],
+  ['.claude/skills/vibe-import/SKILL.md', claudeImportSkill],
+];

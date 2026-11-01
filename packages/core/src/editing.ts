@@ -6,7 +6,7 @@ import { Ajv } from 'ajv';
 import { isMap, isScalar, isSeq } from 'yaml';
 import type { Cell, EditOperation, MutationOptions, Project, RenameKind, TableSchema, WriteResult, YamlFile } from './types.js';
 import { isRecord, validName, VibeError } from './types.js';
-import { formatYaml, parseYaml, updateCell } from './yaml.js';
+import { formatYaml, formattedKey, parseYaml, updateCell } from './yaml.js';
 import { mutateProject, projectWithChanges } from './project.js';
 import { declaredReferences, deletionDiagnostics, tableContexts } from './validation.js';
 import { textCandidates, whereUsed } from './usage.js';
@@ -58,7 +58,7 @@ function renameField(file: YamlFile, path: (string | number)[], from: string, to
   if (map.has(to)) throw new VibeError('NAME_EXISTS', 'Column already exists: ' + to);
   const key = map.items.find(pair => isScalar(pair.key) && pair.key.value === from)?.key;
   if (!isScalar(key) || !key.range) return file;
-  return parseYaml(file.source.slice(0, key.range[0]) + JSON.stringify(to) + file.source.slice(key.range[1]), file.file);
+  return parseYaml(file.source.slice(0, key.range[0]) + formattedKey(to) + file.source.slice(key.range[1]), file.file);
 }
 function structural(file: YamlFile, schema: TableSchema, change: (doc: ReturnType<YamlFile['document']['clone']>) => void): YamlFile {
   const doc = file.document.clone();
@@ -73,7 +73,7 @@ export function insertCell(file: YamlFile, schema: TableSchema, index: number, c
   const eol = file.source.includes('\r\n') ? '\r\n' : '\n';
   const end = row.range[2];
   const indent = row.range[0] - file.source.lastIndexOf('\n', row.range[0] - 1) - 1;
-  const name = /^[A-Za-z_][\w-]*$/.test(column) ? column : JSON.stringify(column);
+  const name = formattedKey(column);
   const prefix = file.source.slice(0, end);
   const line = ' '.repeat(indent) + name + ': ' + JSON.stringify(value);
   return parseYaml(prefix + (prefix.endsWith('\n') ? '' : eol) + line +
