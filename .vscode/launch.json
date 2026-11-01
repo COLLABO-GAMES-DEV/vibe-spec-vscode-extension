@@ -1,0 +1,23 @@
+{
+  // F5: build, then open the synthetic planning folder in an isolated Extension Development Host.
+  // User data and extensions live in ~/vibe-spec-dev, never in the normal VS Code profile.
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "vibe-spec: Extension Development Host",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}/packages/vscode",
+        "--user-data-dir=${userHome}/vibe-spec-dev/vscode-user-data",
+        "--extensions-dir=${userHome}/vibe-spec-dev/vscode-extensions",
+        "--disable-workspace-trust",
+        "--skip-welcome",
+        "--skip-release-notes",
+        "${userHome}/vibe-spec-dev/sample-planning"
+      ],
+      "outFiles": ["${workspaceFolder}/packages/vscode/dist/**/*.cjs"],
+      "preLaunchTask": "vibe-spec: build"
+    }
+  ]
+}
