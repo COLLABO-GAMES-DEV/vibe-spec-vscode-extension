@@ -19,7 +19,7 @@ pnpm --silent vibe init /tmp/my-planning --json
 pnpm --silent vibe validate --project /tmp/my-planning --json
 ```
 
-`pnpm check`는 빌드, TypeScript 검사, core 계약 테스트, 실제 CLI 프로세스 e2e를 실행합니다. GitHub의 일반 push·PR에서는 Linux의 core·CLI, Playwright 1회, 실제 VS Code 검사를 실행합니다. Windows 전체 검사는 출시 `v*` 태그의 배포 검사 또는 수동 Check 실행에서만 수행합니다. 소스 변경 후 CLI만 실행하려면 먼저 `pnpm build`를 실행합니다.
+`pnpm check`는 빌드, TypeScript 검사, core 계약 테스트, 실제 CLI 프로세스 e2e를 실행합니다. GitHub의 일반 push·PR에서는 Linux의 core·CLI, Playwright 1회, 실제 VS Code 검사를 실행합니다. Windows 전체 검사는 출시 `v*` 태그의 배포 검사 또는 수동 Check 실행에서만 수행합니다. 소스 변경 후 CLI만 실행하려면 먼저 `pnpm build`를 실행합니다. VS Code F5 실행, 브라우저 개발 서버, 합성 시험 기획 폴더는 [로컬 개발 안내](docs/dev-setup.md)를 참고하세요.
 
 ```text
 packages/

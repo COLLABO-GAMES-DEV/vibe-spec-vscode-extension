@@ -1,0 +1,36 @@
+{
+  // Windows: pnpm.cmd avoids pnpm.ps1, which PowerShell's default execution policy blocks.
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "vibe-spec: build",
+      "type": "shell",
+      "command": "pnpm build",
+      "windows": { "command": "pnpm.cmd build" },
+      "group": { "kind": "build", "isDefault": true },
+      "problemMatcher": "$tsc"
+    },
+    {
+      "label": "vibe-spec: webview dev server",
+      "detail": "Browser dev host on a temporary fixture: http://127.0.0.1:5173/?table=items",
+      "type": "shell",
+      "command": "pnpm --filter @vibe-spec/webview dev",
+      "windows": { "command": "pnpm.cmd --filter @vibe-spec/webview dev" },
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "vite",
+        "pattern": { "regexp": "^__never__$" },
+        "background": { "activatesOnStart": true, "beginsPattern": "VITE", "endsPattern": "ready in" }
+      }
+    },
+    {
+      "label": "vibe-spec: recreate sample planning folder",
+      "detail": "Synthetic data only, through the CLI: ~/vibe-spec-dev/sample-planning",
+      "type": "process",
+      "command": "node",
+      "args": ["scripts/dev-sample.mjs", "--force"],
+      "dependsOn": "vibe-spec: build",
+      "problemMatcher": []
+    }
+  ]
+}
