@@ -85,6 +85,41 @@ suite('vibe-spec unified planning tree in native VS Code', function () {
     await eventually(() => api.getProject()?.sources.has('documents/경제/상점/안내.md') === true, 'Nested mixed files were not watched.');
   }
 
+  test('context menu duplicates tables and documents in their domain, opens copies and rejects collisions/stale revisions', async () => {
+    await mixed();
+    const manifest = vscode.extensions.getExtension('ijun17.vibe-spec')!.packageJSON;
+    const menus = manifest.contributes.menus['view/item/context'] as { command: string; when: string }[];
+    for (const kind of ['table', 'document']) assert.ok(menus.some(item => item.command === 'vibe.duplicateResource' && item.when.includes('viewItem == vibe-' + kind)));
+    assert.equal((await vscode.commands.getCommands()).includes('vibe.openPlan'), false);
+    const source = await readFile(join(root, 'tables/경제/상점/offers.yaml'), 'utf8');
+    const previous = api.getProject()!.revision;
+    await command('duplicateResource', { kind: 'table', name: 'offers', to: 'offers_B' });
+    assert.equal(await readFile(join(root, 'tables/경제/상점/offers_B.yaml'), 'utf8'), source.replace('schema: offers', 'schema: "offers_B"'));
+    assert.ok(children(folder('경제/상점')).some(item => item.resource === 'offers_B'));
+    await eventually(() => vscode.window.tabGroups.all.flatMap(group => group.tabs).some(tab => tab.label === 'offers_B'), 'The duplicated table tab did not open.');
+    const revision = api.getProject()!.revision;
+    await assert.rejects(command('duplicateResource', { kind: 'table', name: 'offers', to: 'OFFERS_B' }), /이미|exists/i);
+    await assert.rejects(command('duplicateResource', { kind: 'table', name: 'offers', to: 'stale', revision: previous }), /changed/i);
+    assert.equal(api.getProject()!.revision, revision);
+    await command('duplicateResource', { kind: 'document', name: '안내', to: '안내_B' });
+    assert.deepEqual(await readFile(join(root, 'documents/경제/상점/안내_B.md')), await readFile(join(root, 'documents/경제/상점/안내.md')));
+    await eventually(() => vscode.window.tabGroups.all.flatMap(group => group.tabs).some(tab => tab.label === '안내_B'), 'The duplicated document tab did not open.');
+    assert.equal(validateProject(api.getProject()!).length, 0);
+  });
+
+  test('duplicate menu refuses a source document with an unsaved Webview draft', async () => {
+    await mixed();
+    const panel = await vscode.commands.executeCommand<vscode.WebviewPanel>('vibe.openDocument', '안내');
+    panel.webview.html = `<!doctype html><html><body><script>
+      const host = acquireVsCodeApi(); host.postMessage({type:'documentDraft',dirty:true});
+    </script></body></html>`;
+    const live = api as ExtensionApi & { documents: { hasUnsavedDraft(root: string, name: string): boolean } };
+    await eventually(() => live.documents.hasUnsavedDraft(root, '안내'), 'Draft signal was not received.');
+    await assert.rejects(command('duplicateResource', { kind: 'document', name: '안내', to: '안내_B' }), /초안/);
+    assert.equal(api.getProject()!.sources.has('documents/경제/상점/안내_B.md'), false);
+    panel.dispose();
+  });
+
   test('shows raw slash folder names and opens escaped document scopes without changing Markdown', async () => {
     await command('newFolder', { path: '분류~1보상' });
     await command('newFolder', { name: '분류/보상', folder: '' });
@@ -119,6 +154,7 @@ suite('vibe-spec unified planning tree in native VS Code', function () {
     const views = manifest.contributes.views.vibe as { id: string; name: string }[];
     assert.equal(views.find(view => view.id === 'vibe.tables')?.name, '기획');
     assert.equal(views.some(view => view.id === 'vibe.documents'), false);
+    assert.equal(views.some(view => view.id === 'vibe.plans'), false);
     assert.equal(api.tables, api.planning);
     assert.deepEqual(children().filter(item => item.kind === 'folder').map(label).sort(), ['경제', '빈 폴더'].sort());
     const entries = children(folder('경제/상점'));
@@ -385,7 +421,7 @@ suite('vibe-spec unified planning tree in native VS Code', function () {
       assert.equal(await readFile(file, 'utf8'), bytes);
     }
     try {
-      for (const managed of ['tables', 'schemas', 'documents/assets', 'imports', 'plans']) {
+      for (const managed of ['tables', 'schemas', 'documents/assets', 'imports']) {
         const directory = join(watched, managed, 'nested', 'child');
         const file = join(directory, 'observed.bin');
         await observeBytes(file, 'first', async () => {

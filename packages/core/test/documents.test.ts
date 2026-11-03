@@ -8,7 +8,6 @@ import { createDocument, deleteDocument, documentDiagnostics, editDocument, getD
 import { documentUsages, renameDocumentLinks } from '../src/document-references.js';
 import { formattedSources, loadProject, readPath, writeChanges } from '../src/project.js';
 import { applyEdits, renameResource } from '../src/editing.js';
-import { createPlan, readVariant, writeVariant } from '../src/plans.js';
 import { validateProject } from '../src/validation.js';
 import type { DocumentOperation } from '../src/document-types.js';
 
@@ -143,15 +142,6 @@ describe('document reading and diagnostics', () => {
     expect(view.links.map(link => link.resolved)).toEqual([false, true, false, false, false]);
     expect(view.diagnostics.map(item => item.code)).toEqual(['DOCUMENT_LINK_MISSING', 'DOCUMENT_IMAGE_MISSING', 'DOCUMENT_IMAGE_PATH', 'DOCUMENT_IMAGE_EXTERNAL']);
     expect(listDocuments(p)[0]).toMatchObject({ errors: 3, warnings: 1 });
-  });
-
-  it('validates baseline document links against each table variant', async () => {
-    let p = await project({ 'documents/guide.md': '[row](items/consumable_potion/name)' });
-    p = (await createPlan(p.root, p.revision, 'alternative', { title: 'Alternative', status: 'review' })).project;
-    p = (await writeVariant(p.root, p.revision, 'alternative', 'A', { remove: ['items/consumable_potion'] })).project;
-    expect(documentDiagnostics(p)).toEqual([]);
-    expect(documentDiagnostics(readVariant(p, 'alternative', 'A'))).toContainEqual(expect.objectContaining({ code: 'DOCUMENT_LINK_MISSING' }));
-    expect(validateProject(p)).toContainEqual(expect.objectContaining({ code: 'DOCUMENT_LINK_MISSING' }));
   });
 });
 

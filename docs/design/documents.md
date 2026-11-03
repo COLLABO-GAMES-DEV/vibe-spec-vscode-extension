@@ -4,7 +4,7 @@
 
 ## 범위와 원본
 
-`documents/[도메인/]<문서 이름>.md`가 유일한 본문 원본이다. 파일명·테이블과의 이름 충돌은 기존 이름 규칙을 따른다. 그림은 `documents/assets/`의 파일로 보관하고 Markdown에서는 `assets/<파일명>`으로 연결한다. 그림을 DB나 편집기 JSON 안에 넣지 않는다. 문서 생성·블록 추가/수정/삭제·이름 변경·이미지 추가를 core가 처리한다. 기준안과 [문서 A/B 대안](document-variants.md)을 편집하며 대안은 명시한 범위 안에서만 쓴다. 전달 태그·범용 Notion 변환기는 이번 범위에 넣지 않는다. 이관의 미해결 문제는 기존 컨펌 전 기획 단위에 출처와 질문을 남긴다.
+`documents/[도메인/]<문서 이름>.md`가 유일한 본문 원본이다. 파일명·테이블과의 이름 충돌은 기존 이름 규칙을 따른다. 그림은 `documents/assets/`의 파일로 보관하고 Markdown에서는 `assets/<파일명>`으로 연결한다. 그림을 DB나 편집기 JSON 안에 넣지 않는다. 문서 생성·블록 추가/수정/삭제·이름 변경·이미지 추가를 core가 처리한다. 문서를 자유롭게 편집하며 비교에는 [복제](comparison.md) 또는 본문의 A/B 제목을 사용한다. 전달 태그·범용 Notion 변환기는 이번 범위에 넣지 않는다. 이관의 미해결 문제는 일반 확인 문서에 출처와 질문을 남긴다.
 
 문서를 읽거나 `fmt`를 실행해도 본문을 재출력하지 않는다. UTF-8 원문, BOM, 빈 줄, 들여쓰기, 줄 끝 공백, 개행 종류, 마지막 개행 유무를 보존한다. 화면에서 새로 쓰는 문서·블록은 LF를 사용한다. 파일을 입력받아 생성할 때는 입력 파일의 바이트를 보존한다. 기존 CRLF 문서를 일부 편집할 때도 건드리지 않은 구간은 그대로다. Markdown은 `.gitattributes`의 `documents/**/*.md -text`로 Git의 자동 개행 변환에서 제외한다. YAML의 LF 계약은 바뀌지 않는다.
 
@@ -44,14 +44,14 @@ where-used는 구조화된 링크와 자유 본문 후보를 나누어 반환한
 
 외부 파일 변경은 감시해 새로 읽는다. 편집 중인 문서와 열 때의 revision은 유지하며, 저장이 거절되면 이유·현재 원문을 보여준다. 사용자 확인 없이 외부 변경 위에 덮어쓰지 않는다. 문서·링크·검증은 core 결과를 받아 표시한다. 이미지는 허용된 프로젝트 내부 파일을 host가 Webview URI로 전달하며 외부 주소를 자동으로 가져오지 않는다.
 
-최소 CLI는 `document list/read/create/edit/delete`, `document image`와 기존 `read`, `where-used`, `rename document|heading|tag`, `validate`를 사용한다. create는 Markdown 파일 입력, edit는 블록 순번 기반 작업 JSON을 받는다. 쓰기는 `--target base --expect-revision`과 `--dry-run`을 지원한다. AGENTS.md에는 블록 순번을 revision 밖에 보관하지 말 것과 전체 문서 재직렬화 금지를 적는다.
+최소 CLI는 `document list/read/create/edit/delete`, `document image`와 기존 `read`, `where-used`, `rename document|heading|tag`, `validate`를 사용한다. create는 Markdown 파일 입력, edit는 블록 순번 기반 작업 JSON을 받는다. 쓰기는 `--expect-revision`과 `--dry-run`을 지원한다. AGENTS.md에는 블록 순번을 revision 밖에 보관하지 말 것과 전체 문서 재직렬화 금지를 적는다.
 
 ## 저장·검사·실전 이관
 
 문서와 로컬 그림은 기획 관리 파일로 Git 저장에 포함한다. Markdown 충돌은 Git의 줄 단위 병합을 먼저 쓰고 남은 충돌은 기존 파일 선택 화면에서 기준/내 변경/받은 변경을 고른다. 블록용 병합 엔진은 만들지 않는다.
 
 - core: 원문 재읽기·무변경 저장·fmt 바이트 동일, 전체 순서 입력의 추가/삭제/이동·반복 내용·여러 문서 동시 저장, 한 블록 밖 바이트 동일(한글/이모지/BOM/CRLF 포함), 제목/태그 경로·중복·링크 검증, rename 목적지 최소 수정, stale 거절, 이미지 경로 경계.
-- CLI: 실제 프로세스로 생성·블록 편집·rename·where-used·validate·Git 저장을 검증하고 일반 테이블·기획 대안 회귀 검사를 유지한다.
+- CLI: 실제 프로세스로 생성·블록 편집·rename·where-used·validate·Git 저장을 검증하고 일반 테이블·복제 회귀 검사를 유지한다.
 - Playwright: 브라우저 가짜 host도 실제 core를 사용한다. 단일 편집기 연속 입력·사유 저장·사유 취소·무변경 저장, 기본 슬래시/사이드 메뉴·드래그·추가·이동·삭제·되돌리기, 표/체크/이미지, 원문 보존, 셀 참조 표시, 외부 변경 draft 보존을 검사한다.
 - 실제 VS Code: 단일 트리·자연 정렬·문서별 독립 탭·재열기·이름 변경·파일 감시·문서 간 경로 이동·사유 저장 시 여러 문서 flush와 커밋을 API 수준으로 확인한다. 기존 Linux·Windows CI 여섯 작업에 포함한다.
 - 시험 폴더의 보존된 Notion 34개 원문을 일회성 스크립트와 CLI로 이관한다. 확실한 페이지/그림 링크만 목적지를 바꾸고 변경 구간·출처·해시를 기록한다. 나머지 바이트와 원본 파일은 보존한다. 깨진 링크·지원 불가 요소·판단이 필요한 자기 링크는 컨펌 전 기획에 기록한다. 기존 importer는 유지한다.

@@ -5,7 +5,7 @@
   "homepage": "https://github.com/COLLABO-GAMES-DEV/vibe-spec-vscode-extension#readme",
   "displayName": "vibe-spec — 게임 기획",
   "description": "Git 파일을 원본으로 사용하는 게임 기획 테이블·문서 편집기",
-  "version": "0.9.1",
+  "version": "0.10.0",
   "publisher": "ijun17",
   "license": "UNLICENSED",
   "private": true,
@@ -23,6 +23,7 @@
       { "command": "vibe.renameFolder", "title": "폴더 이름 바꾸기" },
       { "command": "vibe.deleteFolder", "title": "빈 폴더 삭제" },
       { "command": "vibe.moveFolder", "title": "폴더 이동" },
+      { "command": "vibe.duplicateResource", "title": "복제", "icon": "$(copy)" },
       { "command": "vibe.moveResource", "title": "다른 폴더로 이동" },
       { "command": "vibe.openDocument", "title": "vibe-spec: 문서 열기" },
       { "command": "vibe.newDocument", "title": "새 문서", "icon": "$(add)" },
@@ -41,15 +42,16 @@
       { "command": "vibe.selectFolder", "title": "vibe-spec: 기획 폴더 선택" },
       { "command": "vibe.initFolder", "title": "vibe-spec: 기획 폴더 초기화" },
       { "command": "vibe.openTable", "title": "vibe-spec: 테이블 열기" },
-      { "command": "vibe.openPlan", "title": "vibe-spec: 기획 비교", "icon": "$(git-compare)" },
       { "command": "vibe.refresh", "title": "vibe-spec: 새로 고침", "icon": "$(refresh)" },
       { "command": "vibe.openError", "title": "vibe-spec: 오류 위치로 이동" }
     ],
     "viewsContainers": { "activitybar": [{ "id": "vibe", "title": "vibe-spec", "icon": "media/vibe.svg" }] },
     "views": { "vibe": [
-      { "id": "vibe.tables", "name": "기획" }, { "id": "vibe.plans", "name": "기획 비교" }, { "id": "vibe.errors", "name": "검증 오류" }, { "id": "vibe.delivery", "name": "저장·올리기" }
+      { "id": "vibe.tables", "name": "기획" }, { "id": "vibe.errors", "name": "검증 오류" }, { "id": "vibe.delivery", "name": "저장·올리기" }
     ] },
     "menus": { "view/item/context": [
+      { "command": "vibe.duplicateResource", "when": "view == vibe.tables && viewItem == vibe-table", "group": "table@0" },
+      { "command": "vibe.duplicateResource", "when": "view == vibe.tables && viewItem == vibe-document", "group": "document@0" },
       { "command": "vibe.newFolder", "when": "view == vibe.tables && viewItem == vibe-folder", "group": "folder@0" },
       { "command": "vibe.newTable", "when": "view == vibe.tables && viewItem == vibe-folder", "group": "folder@1" },
       { "command": "vibe.newDocument", "when": "view == vibe.tables && viewItem == vibe-folder", "group": "folder@2" },
@@ -67,9 +69,7 @@
       { "command": "vibe.newResource", "when": "view == vibe.tables", "group": "navigation@0" },
       { "command": "vibe.import", "when": "view == vibe.tables", "group": "transfer@1" },
       { "command": "vibe.export", "when": "view == vibe.tables", "group": "transfer@2" },
-      { "command": "vibe.refresh", "when": "view == vibe.tables", "group": "navigation@1" },
-      { "command": "vibe.openPlan", "when": "view == vibe.plans", "group": "navigation@1" },
-      { "command": "vibe.refresh", "when": "view == vibe.plans", "group": "navigation@2" }
+      { "command": "vibe.refresh", "when": "view == vibe.tables", "group": "navigation@1" }
     ] },
     "viewsWelcome": [{
       "view": "vibe.tables",

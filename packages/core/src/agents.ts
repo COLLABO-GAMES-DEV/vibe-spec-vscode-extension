@@ -6,7 +6,7 @@ export const planningAgentInstructions = `# 기획 폴더 작업 안내
 
 에이전트 안내의 원본은 이 파일과 \`.agents/skills/\`다. Claude Code용 \`CLAUDE.md\`와 \`.claude/skills/\`는 이 원본을 가리키기만 한다. 규칙을 바꿀 때는 원본만 고친다.
 
-기존 시트나 Notion 내보내기를 옮길 때는 [vibe-import 스킬](.agents/skills/vibe-import/SKILL.md)을 읽는다. 원본 조사는 \`vibe source inspect <file> --json\`, 쓰기 미리보기는 \`edit/apply --dry-run\`과 \`plan create/variant/status/approve --dry-run\`이다. 이미 승인된 단순 표는 기존 import plan/apply를 써도 된다. 원본끼리 다른 값과 새 해석이 필요한 부분은 사람이 결정할 목록으로 남긴다.
+기존 시트나 Notion 내보내기를 옮길 때는 [vibe-import 스킬](.agents/skills/vibe-import/SKILL.md)을 읽는다. 원본 조사는 \`vibe source inspect <file> --json\`, 쓰기 미리보기는 \`edit/apply --dry-run\`이다. 이미 승인된 단순 표는 기존 import plan/apply를 써도 된다. 원본끼리 다른 값과 새 해석이 필요한 부분은 사람이 결정할 목록으로 남긴다.
 
 ## CLI 찾기
 
@@ -36,9 +36,9 @@ vibe --help
 현재 폴더를 기획 루트로 사용한다. Windows PowerShell에서는 특히 []가 든 경로에서 시작 위치가 달라질 수 있으므로 Set-Location -LiteralPath로 기획 루트에 이동하거나 매번 --project에 기획 루트의 절대경로를 지정한다. 다른 위치에서 실행하면 \`--project <기획 폴더>\`를 붙인다. \`tables/**/*.yaml\`의 파일 이름이 테이블 이름이다. 열 코드명과 Key 열은 읽은 스키마를 따른다. 아래 이름은 예시이며 사용자 데이터의 이름으로 바꾼다.
 
 \`\`\`sh
-vibe read items --target base --json
-vibe read items/currency_gold --target base --json
-vibe read 'items/currency_gold/name' --target base --json
+vibe read items --json
+vibe read items/currency_gold --json
+vibe read 'items/currency_gold/name' --json
 vibe validate --json
 \`\`\`
 
@@ -71,9 +71,9 @@ JSON 결과는 \`{ok, revision, data, diagnostics}\`이고 읽기·편집 대상
 \`\`\`
 
 \`\`\`sh
-vibe edit --target base --input change.json --expect-revision <read의_revision> --json
-vibe apply --target base --input changes.json --expect-revision <read의_revision> --json
-vibe rename key items/currency_gold --target base --to currency_coin --expect-revision <read의_revision> --json
+vibe edit --input change.json --expect-revision <read의_revision> --json
+vibe apply --input changes.json --expect-revision <read의_revision> --json
+vibe rename key items/currency_gold --to currency_coin --expect-revision <read의_revision> --json
 vibe where-used items/currency_coin --json
 \`\`\`
 
@@ -121,18 +121,18 @@ import는 inspect → plan → apply 순서로 원문과 매핑을 확인하고 
 \`\`\`sh
 vibe document list --json
 vibe document read economy --json
-vibe read economy/재화/획득 --target base --json
-vibe document create economy --input economy.md --target base --expect-revision <읽은_revision> --dry-run --json
-vibe document edit economy --input blocks.json --target base --expect-revision <document_read의_revision> --dry-run --json
-vibe document delete economy --target base --expect-revision <읽은_revision> --dry-run --json
-vibe document image diagram.png --target base --expect-revision <읽은_revision> --dry-run --json
-vibe rename document economy --target base --to balance --expect-revision <읽은_revision> --json
-vibe rename heading balance/재화 --target base --to 화폐 --expect-revision <읽은_revision> --json
-vibe rename tag balance/화폐/설명 --target base --to 안내 --expect-revision <읽은_revision> --json
+vibe read economy/재화/획득 --json
+vibe document create economy --input economy.md --expect-revision <읽은_revision> --dry-run --json
+vibe document edit economy --input blocks.json --expect-revision <document_read의_revision> --dry-run --json
+vibe document delete economy --expect-revision <읽은_revision> --dry-run --json
+vibe document image diagram.png --expect-revision <읽은_revision> --dry-run --json
+vibe rename document economy --to balance --expect-revision <읽은_revision> --json
+vibe rename heading balance/재화 --to 화폐 --expect-revision <읽은_revision> --json
+vibe rename tag balance/화폐/설명 --to 안내 --expect-revision <읽은_revision> --json
 vibe where-used balance/화폐 --json
 \`\`\`
 
-기준안 문서 쓰기는 기획 생성 전에도 항상 \`--target base --expect-revision\`이 필수다. create/edit/delete/image는 먼저 --dry-run 결과를 확인하고 같은 입력·revision에서 --dry-run만 빼고 적용한다. create의 --input은 UTF-8 Markdown 파일이며 BOM도 원문 그대로 보존한다. edit의 --input은 다음과 같은 JSON 배열이다.
+문서 쓰기는 \`--expect-revision\`이 필수다. \`--target base\`는 이전 명령 호환용이며 생략한다. create/edit/delete/image는 먼저 --dry-run 결과를 확인하고 같은 입력·revision에서 --dry-run만 빼고 적용한다. create의 --input은 UTF-8 Markdown 파일이며 BOM도 원문 그대로 보존한다. edit의 --input은 다음과 같은 JSON 배열이다.
 
 \`\`\`json
 [{"op":"replace","block":1,"markdown":"고친 문단"},{"op":"insert","before":2,"markdown":"새 문단"},{"op":"delete","block":3}]
@@ -142,41 +142,11 @@ block과 before는 0부터 시작하며 같은 읽기 revision의 블록 순번�
 
 제목·이름표와 참조된 이름을 바꿀 때는 rename을 사용한다. 일반 문구·코드의 이름 후보는 자동 치환하지 않는다. 이미지 추가 결과의 path는 \`assets/<파일명>\`이며 \`![설명](assets/<파일명>)\`으로 연결한다. 이미지는 \`documents/assets/\`에 저장되고 문서 본문은 별도의 블록 편집으로 연결한다. revision이 오래되면 document read로 새 원문과 요청을 비교하고 순번·범위를 다시 고른다.
 
-## 문서 대안 편집
+## 복제와 자유 편집
 
-문서 대안도 core가 합친 결과로만 읽는다. 먼저 plan variant 입력에 documents: {"economy/재화": "## 재화\\n\\n대안 본문"}처럼 범위를 선언한다. 문서 전체 이름, 제목 경로 또는 이름표 문단만 선택할 수 있다. 목록·표 개별 선택과 범위 중첩은 지원하지 않는다. document_base_values는 core가 캡처하므로 입력에 쓰거나 갱신하지 않는다.
+vibe duplicate table offers --to offers_B --expect-revision <revision> --dry-run --json으로 미리 보고, 같은 입력·revision에서 --dry-run만 빼고 적용한다. 문서는 duplicate document guide --to guide_B를 사용한다. 복제본은 같은 폴더의 독립 파일이다. 표는 별도 스키마를 갖고 참조·링크 대상은 그대로 유지한다. 문서 Markdown은 바이트 그대로 복사한다. VS Code에서는 사이드바 표·문서를 우클릭하고 복제를 고른다.
 
-vibe document read economy --target review/A --json으로 합쳐진 블록·revision·selectedScopes를 읽는다. vibe document edit economy --target review/A --input blocks.json --expect-revision <읽은_revision> --dry-run --json으로 확인한 후 적용한다. 작업 순번은 그 합친 문서 revision 안에서만 유효하다. 대안 YAML만 바뀌며 기준안 Markdown은 확정 전까지 바뀌지 않는다. 선택한 제목·이름표는 유지하고 범위 밖 편집은 거절한다. plan read에서 이전 기준/현재 기준/대안을 확인하며, 사람이 선택한 경우에만 plan approve를 실행한다. 원문 출처를 우선순위로 자동 선택하지 않는다.
-
-## 기획 단위와 대안
-
-에이전트는 기획이 아직 없어도 기준안 읽기·쓰기 예시에 항상 \`--target base\`를 명시한다. CLI는 기획 생성 전의 기존 쓰기만 대상 생략을 허용한다. 기획이 있으면 edit/apply/rename/import apply에 \`--target base\`가 필수이며 다른 대상은 거절한다. 테이블 대안은 \`plan variant\`로 쓴다. 문서 대안의 편집은 아래 문서 대상 규칙도 따른다.
-
-\`\`\`sh
-vibe plan list --json
-vibe plan read price-review --json
-vibe plan create price-review --input definition.json --expect-revision <read의_revision> --dry-run --json
-vibe plan create price-review --input definition.json --expect-revision <read의_revision> --json
-vibe plan variant price-review/A --input variant-a.json --expect-revision <직전_revision> --dry-run --json
-vibe plan variant price-review/A --input variant-a.json --expect-revision <직전_revision> --json
-vibe plan variant price-review/B --input variant-b.json --expect-revision <직전_revision> --dry-run --json
-vibe plan variant price-review/B --input variant-b.json --expect-revision <직전_revision> --json
-vibe read offers/bundle --target price-review/A --json
-vibe plan status price-review --to review --expect-revision <직전_revision> --dry-run --json
-vibe plan status price-review --to review --expect-revision <직전_revision> --json
-vibe plan status price-review --to draft --expect-revision <직전_revision> --dry-run --json
-vibe plan status price-review --to draft --expect-revision <직전_revision> --json
-\`\`\`
-
-plan 쓰기도 먼저 --dry-run으로 파일·변경값·진단을 확인한 뒤 같은 입력·revision에서 --dry-run만 빼고 실행한다. 미리보기는 현재 revision과 applied: false, 빈 changed, 예정 파일 planned와 파일 내용 preview를 반환하며 파일을 바꾸지 않는다. plan list/read에는 --dry-run을 쓰지 않는다.
-
-definition.json은 \`{"title":"가격 검토","status":"review","question":"어느 원문을 채택할까요?","sources":[]}\`다. 대상을 모르면 question과 원문 sources만 둔 review 기획을 만들고 대안을 만들지 않는다. 경로를 추측하거나 승인 대기를 가짜 B안으로 만들지 않는다.
-
-variant-a.json은 \`{"set":{"offers/bundle/price":"00042.0000"},"sources":[]}\`처럼 작성한다. 행 추가는 \`add: {"offers/new": {"available":true}}\`, 행 삭제는 \`remove: ["offers/old"]\`다. 추가할 Key는 행 경로에서 얻으므로 본문에 다시 쓰지 않는다. 원래 file·sourceHash·sheet/cell 또는 page/path·raw를 sources에 보존하고 해석한 값과 구별한다. base_values와 base_missing은 core가 기록하므로 입력에 만들지 않는다.
-
-A/B는 모두 기존 기준안 위의 대등한 변경분이다. \`read --target <plan>/<variant>\`가 core의 합친 값을 제공하며 에이전트가 직접 병합하지 않는다. \`plan read\`로 기준안·각 대안·진단을 비교하고 \`validate\`로 기준안과 각 대안을 모두 검증한다. 기준안 변경 경고는 이전 기준값·현재 기준값·대안과 함께 사람에게 보고한다.
-
-확정은 사람이 선택한 경우에만 \`vibe plan approve price-review/A --expect-revision <직전_revision> --dry-run --json\`으로 미리 보고 같은 revision에서 --dry-run을 빼고 실행한다. 선택한 변경분을 기준안에 반영하고 다른 안과 출처는 보관한다. 확정된 기획은 다시 편집·합쳐 읽지 않으며 plan read로 보관 내용을, Git으로 과거 합친 상태를 확인한다. validate는 보관본의 문법을 검사하되 현재 기준안에 다시 적용하지 않는다. 이관 권한이나 검증 성공을 업무 내용의 자동 승인으로 해석하지 않는다. 기획 상태는 draft/review/approved이며 approved는 status --to로 만들지 않는다.
+전용 plan/variant/approve 절차는 없다. 일반 표 또는 문서 안 A/B 제목으로 비교한다. 충돌하는 원문·출처를 일반 문서에 모두 보존하고 최종 값은 사람에게 확인한다. 출처를 조용히 선택하지 않는다. 옛 plans/ 파일은 보존하지만 관리하지 않으며 별도 요청 없이 수정·삭제·합치기하지 않는다. --target base는 이전 명령 호환용 선택 인자이고 다른 target은 거절한다.
 
 ## 지켜야 할 것
 
@@ -196,7 +166,7 @@ A/B는 모두 기존 기준안 위의 대등한 변경분이다. \`read --target
 
 ## 이름에 /가 있는 경우
 
-원문 제목·이름표·Key를 바꾸지 않는다. 주소의 구분자는 /이고 이름 안의 /는 ~1, ~는 ~0으로 바꾼 뒤 주소 앞에 ./를 붙인다. 예: Key 30/10 → ./items/30~110. 기존 items/30~110은 문자 그대로의 Key 30~110이다. document read와 folder list가 반환한 주소를 그대로 쓰는 것이 안전하다. where-used·rename 대상·기획 대안의 set/documents 주소도 동일하다. 대안에는 core가 반환한 canonical 주소를 쓴다.
+원문 제목·이름표·Key를 바꾸지 않는다. 주소의 구분자는 /이고 이름 안의 /는 ~1, ~는 ~0으로 바꾼 뒤 주소 앞에 ./를 붙인다. 예: Key 30/10 → ./items/30~110. 기존 items/30~110은 문자 그대로의 Key 30~110이다. document read와 folder list가 반환한 주소를 그대로 쓰는 것이 안전하다. where-used·rename 대상 주소도 동일하다. core가 반환한 주소를 쓴다.
 
 apply JSON의 key와 ref 칸, rename --to 같은 새 이름 인자에는 이스케이프하지 않은 원문을 넣는다. Markdown 링크 목적지는 <...>로 감싸고 원문 %는 %25로 URI 인코딩한다. 전체 주소를 URI 디코딩해 구분자와 이름을 혼동하지 않는다. 폴더도 ./공격~1방어 형태로 만들고 CLI로 이동한다. 실제 디렉터리명과 .gitkeep의 원래 이름 기록을 수동으로 편집하지 않는다. 파일명인 테이블·스키마·문서의 Windows 안전 규칙은 유지한다.
 `;

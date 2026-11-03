@@ -11,8 +11,6 @@ import { mutateProject, projectWithChanges } from './project.js';
 import { declaredReferences, deletionDiagnostics, tableContexts } from './validation.js';
 import { textCandidates, whereUsed } from './usage.js';
 import { resourceNameError, resourceNameKey, suggestResourceName } from './names.js';
-import { hasPlanAddedRow, renamePlanReferences } from './plan-references.js';
-import { readVariant } from './plans.js';
 
 const cells = { type: 'object', additionalProperties: { type: ['string', 'boolean', 'null'] } };
 const checkOperations = new Ajv({ allErrors: true, allowUnionTypes: true }).compile<EditOperation[]>({
@@ -131,22 +129,6 @@ export function prepareEdits(before: Project, operations: EditOperation[]): Map<
       });
       const restored = projectWithChanges(planned, new Map([[file.file, probe.source]]));
       const guard = deletionDiagnostics(restored, removed.table, removed.key);
-      // The composed reader strips plans, so its own row operations do not recurse
-      // into this pass. Archives and invalid/uncomposable alternatives are not
-      // live states; their diagnostics remain visible through normal validation.
-      for (const path of restored.sources.keys()) {
-        const match = /^plans\/([^/]+)\/(?!_plan\.yaml$)([^/]+)\.yaml$/.exec(path);
-        if (!match) continue;
-        const [, plan, variant] = match;
-        try {
-          const view = readVariant(restored, plan!, variant!);
-          const context = tableContexts(view).get(removed.table);
-          if (!context?.table.rows.some(row => row[context.schema.primary_key] === removed.key)) continue;
-          guard.push(...deletionDiagnostics(view, removed.table, removed.key).map(item => ({
-            ...item, target: pathFromParts([removed.table, removed.key]), message: plan + '/' + variant + ': ' + item.message,
-          })));
-        } catch (error) { if (!(error instanceof VibeError)) throw error; }
-      }
       if (guard.length) throw new VibeError('DELETE_RESTRICTED', 'Declared references prevent deletion.', guard);
     }
     return changes;
@@ -218,14 +200,14 @@ export async function renameResource(
     if (kind === 'key') {
       keyName(to);
       if (to === key) return changes;
-      if (target.table.rows.some(row => row[target.schema.primary_key] === to) || hasPlanAddedRow(before, pathFromParts([name!, to]))) {
-        throw new VibeError('NAME_EXISTS', 'Key already exists in the baseline or an alternative: ' + to);
+      if (target.table.rows.some(row => row[target.schema.primary_key] === to)) {
+        throw new VibeError('NAME_EXISTS', 'Key already exists: ' + to);
       }
       if (target.table.rows.some(row => row[target.schema.primary_key] === key)) {
         const index = rowIndex(before, name!, key!);
         const edited = scalar(target.file, ['rows', index, target.schema.primary_key], to);
         changes.set(edited.file, edited.source);
-      } else if (!hasPlanAddedRow(before, pathFromParts([name!, key!]))) throw new VibeError('PATH_NOT_FOUND', 'Unknown row: ' + path);
+      } else throw new VibeError('PATH_NOT_FOUND', 'Unknown row: ' + path);
       for (const reference of declaredReferences(before)) {
         if (reference.target !== name) continue;
         for (const [i, row] of reference.table.rows.entries()) {
@@ -269,7 +251,6 @@ export async function renameResource(
       }
     }
     for (const [file, source] of renameDocumentLinks(before, kind, path, to)) changes.set(file, source);
-    for (const [file, source] of renamePlanReferences(before, kind, path, to)) changes.set(file, source);
     return changes;
   }, options);
   return { ...result, candidates };

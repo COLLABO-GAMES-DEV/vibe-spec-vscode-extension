@@ -455,7 +455,6 @@ export function App({ host }: { host: Host }) {
         <button onClick={() => withCommit(() => find.current?.open())}>찾기</button>
         <button disabled={!active} onClick={() => withCommit((_, renamed) => { if (activeRef.current) host.send({ type: 'whereUsed', key: renamed?.from === activeRef.current.key ? renamed.to : activeRef.current.key }); })}>행 사용처 보기</button></div>
     </header>
-    <p className="baseline-banner"><strong>편집 대상: 기준안</strong> · 이 표의 변경은 모든 대안이 참고하는 기준안에 반영됩니다.</p>
     <ViewTools view={view} onFocus={toolbarFocus} />
     <FindBar snapshot={snapshot} control={find} onNavigate={cell => navigate({ cell, focus: false })} />
     <p className="hint">클릭 선택 · 바로 타이핑하면 덮어쓰기 · Enter/F2/더블클릭 편집 · Shift+클릭/드래그로 범위 선택 · Cmd/Ctrl+C 복사 · Cmd/Ctrl+F 찾기</p>

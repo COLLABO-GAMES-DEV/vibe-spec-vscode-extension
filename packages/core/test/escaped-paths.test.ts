@@ -7,10 +7,8 @@ import { loadProject, readPath, formattedSources } from '../src/project.js';
 import { applyEdits, renameResource } from '../src/editing.js';
 import { pathParts, pathFromParts } from '../src/paths.js';
 import { validateProject } from '../src/validation.js';
-import { createPlan, writeVariant, readVariant, approvePlan, getPlan } from '../src/plans.js';
 import { whereUsed } from '../src/usage.js';
 import { createDocument, getDocumentView, saveDocumentSnapshots } from '../src/documents.js';
-import { documentScope } from '../src/document-variants.js';
 import { applyFolderEdit } from '../src/folders.js';
 import { folderStorage } from '../src/folder-names.js';
 import { listFolders, resourceEntries } from '../src/resources.js';
@@ -30,7 +28,7 @@ it('keeps legacy tilde, percent and full-width names distinct from explicit esca
   expect(pathParts('./items/30~01~110')).toEqual(['items', '30~1/10']);
   expect(() => pathParts('./items/~2')).toThrow();
 });
-it('reads, renames, tracks and protects raw slash Keys across refs, Markdown and alternatives', async () => {
+it('reads, renames, tracks and protects raw slash Keys across refs and Markdown', async () => {
   let p = await fixture();
   p = (await renameResource(p.root, p.revision, 'key', 'items/currency_gold', 'coin/blue')).project;
   p = (await applyEdits(p.root, p.revision, [{ op: 'create', table: 'items', row: { code: 'coin~1blue', name: 'literal', kind: 'currency', note: '' } }])).project;
@@ -39,32 +37,23 @@ it('reads, renames, tracks and protects raw slash Keys across refs, Markdown and
   expect(readPath(p, 'items/coin~1blue/name')).toEqual({ value: 'literal', present: true });
   expect(validateProject(p)).toEqual([]);
   await expect(applyEdits(p.root, p.revision, [{ op: 'delete', table: 'items', key: 'coin/blue' }])).rejects.toMatchObject({ code: 'DELETE_RESTRICTED' });
-  p = (await createPlan(p.root, p.revision, 'review', { title: 'Synthetic', status: 'review' })).project;
-  p = (await writeVariant(p.root, p.revision, 'review', 'A', { set: { './items/coin~1blue/name': '대안' } })).project;
-  expect(readPath(readVariant(p, 'review', 'A'), './items/coin~1blue/name')).toEqual({ value: '대안', present: true });
   const used = await whereUsed(p, './items/coin~1blue');
-  expect(used.references.map(u => u.file)).toEqual(expect.arrayContaining(['tables/offers.yaml', 'documents/guide.md', 'plans/review/A.yaml']));
+  expect(used.references.map(u => u.file)).toEqual(expect.arrayContaining(['tables/offers.yaml', 'documents/guide.md']));
   p = (await renameResource(p.root, p.revision, 'key', './items/coin~1blue', 'coin/red~1')).project;
-  expect(getPlan(p, 'review').variants.A!.set).toHaveProperty('./items/coin~1red~01/name');
   expect(p.sources.get('documents/guide.md')).toContain('(./items/coin~1red~01/name)');
   expect(p.sources.get('documents/guide.md')).toContain('(items%2Fcoin~1blue%2Fname)');
   expect(validateProject(p)).toEqual([]);
 });
-it('preserves slash headings/tags, scoped alternatives and every byte outside a confirmed scope', async () => {
+it('preserves slash headings/tags, and all unrelated bytes during renames', async () => {
   let p = await fixture();
   const source = '\uFEFF# 공격 / 방어\r\n\r\n<!-- name: 기본/값~1 -->\r\n원문  \r\n\r\n# 바깥\r\n\r\n끝  ';
   p = (await createDocument(p.root, p.revision, 'guide', source)).project;
   const path = pathFromParts(['guide', '공격 / 방어', '기본/값~1']);
   const view = getDocumentView(p, 'guide'); expect(view.diagnostics).toEqual([]);
   expect((await saveDocumentSnapshots(p.root, p.revision, [{ name: 'guide', blocks: view.blocks.map(b => ({ original: b.index })) }])).changed).toEqual([]);
-  p = (await createPlan(p.root, p.revision, 'review', { title: 'Synthetic', status: 'review' })).project;
-  p = (await writeVariant(p.root, p.revision, 'review', 'A', { documents: { [path]: '대안  ' } })).project;
-  expect((await whereUsed(p, path)).references.some(u => u.file === 'plans/review/A.yaml')).toBe(true);
   p = (await renameResource(p.root, p.revision, 'heading', pathFromParts(['guide', '공격 / 방어']), '새/제목~1')).project;
   const next = pathFromParts(['guide', '새/제목~1', '기본/값~1']);
-  expect(documentScope(readVariant(p, 'review', 'A'), next).markdown).toBe('대안  ');
-  p = (await approvePlan(p.root, p.revision, 'review', 'A')).project;
-  expect(p.sources.get('documents/guide.md')).toBe(source.replace('공격 / 방어', '새\\/제목\\~1').replace('원문  ', '대안  '));
+  expect(p.sources.get('documents/guide.md')).toBe(source.replace('공격 / 방어', '새\\/제목\\~1'));
   expect(validateProject(p)).toEqual([]);
 });
 it('keeps slash domain names distinct from literal escape spellings through creation, movement and rename', async () => {
@@ -81,7 +70,7 @@ it('keeps slash domain names distinct from literal escape spellings through crea
   const entry = resourceEntries(p, 'table').find(e => e.name === 'items')!;
   expect(p.sources.get(entry.file)).toBe(await readFile(fileURLToPath(new URL('./fixtures/project/tables/items.yaml', import.meta.url)), 'utf8'));
 });
-it('renames added alternative Keys and columns, removes slash rows, and keeps undo addresses consistent', async () => {
+it('renames added Keys and columns, removes slash rows, and keeps undo addresses consistent', async () => {
   const { ScreenHistory } = await import('../src/history.js');
   const { resolveReference } = await import('../src/view.js');
   let p = await fixture(); const history = new ScreenHistory();
@@ -92,13 +81,10 @@ it('renames added alternative Keys and columns, removes slash rows, and keeps un
   expect(readPath(p, 'items/currency_gold')).toBeDefined();
   p = (await history.redo(p.root, p.revision)).project;
   expect(readPath(p, './items/coin~1blue')).toBeDefined();
-  p = (await createPlan(p.root, p.revision, 'review', { title: 'Synthetic', status: 'review' })).project;
-  p = (await writeVariant(p.root, p.revision, 'review', 'A', { add: { './items/new~1row': { name: 'new', kind: 'currency', note: '' } }, remove: ['items/consumable_potion'] })).project;
+  p = (await applyEdits(p.root, p.revision, [{ op: 'create', table: 'items', row: { code: 'new/row', name: 'new', kind: 'currency', note: '' } }])).project;
   p = (await renameResource(p.root, p.revision, 'key', './items/new~1row', 'new/row~1')).project;
   p = (await renameResource(p.root, p.revision, 'column', 'items/*/name', 'title')).project;
-  expect(readPath(readVariant(p, 'review', 'A'), './items/new~1row~01/title')).toMatchObject({ value: 'new' });
   p = (await renameResource(p.root, p.revision, 'table', 'items', 'goods')).project;
-  expect(readPath(readVariant(p, 'review', 'A'), './goods/new~1row~01/title')).toMatchObject({ value: 'new' });
   expect(validateProject(p)).toEqual([]);
 });
 it('imports slash Keys to a slash domain, exports physical folders, and detects inconsistent folder markers', async () => {

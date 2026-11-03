@@ -3,7 +3,7 @@ import * as vscode from 'vscode';
 import { posix } from 'node:path';
 import {
   applyFolderEdit, folderStorage, compareResourceNames, folderError, listFolders, loadProject, resourceEntries, resourceFile,
-  validateProject, VibeError,
+  validateProject, VibeError, duplicateResource, duplicateNameError, suggestResourceName,
 } from '@vibe-spec/core';
 import type { FolderOperation, Project } from '@vibe-spec/core';
 
@@ -15,7 +15,7 @@ interface FolderInput {
   path?: string; name?: string; folder?: string; kind?: 'table' | 'document';
   revision?: string; confirmed?: boolean;
   projectRoot?: string; create?: 'folder' | 'table' | 'document';
-  table?: string; key?: { code: string; label: string };
+  table?: string; key?: { code: string; label: string }; to?: string;
 }
 type Selection = PlanningItem | FolderInput;
 const parentFolder = (path: string) => pathFromParts(pathParts(path).slice(0, -1));
@@ -28,7 +28,8 @@ export class PlanningTree implements vscode.TreeDataProvider<PlanningItem>, vsco
   readonly view: vscode.TreeView<PlanningItem>;
   private readonly subscriptions: vscode.Disposable[];
   constructor(private readonly context: vscode.ExtensionContext,
-    private readonly getProject: () => Project | undefined, private readonly refresh: () => Promise<void>) {
+    private readonly getProject: () => Project | undefined, private readonly refresh: () => Promise<void>,
+    private readonly assertNoDraft: (kind: 'table' | 'document', name: string) => void = () => {}) {
     this.view = vscode.window.createTreeView('vibe.tables', { treeDataProvider: this, showCollapseAll: true });
     const command = (id: string, handler: (input?: Selection) => Promise<unknown>) => vscode.commands.registerCommand(id, async input => {
       try { return await handler(input); }
@@ -43,9 +44,31 @@ export class PlanningTree implements vscode.TreeDataProvider<PlanningItem>, vsco
       command('vibe.deleteFolder', input => this.edit('folder-delete', input)),
       command('vibe.moveFolder', input => this.edit('folder-move', input)),
       command('vibe.moveResource', input => this.edit('resource-move', input)),
+      command('vibe.duplicateResource', input => this.duplicate(input)),
     ];
   }
   update() { this.changed.fire(); }
+  private async duplicate(selection?: Selection) {
+    const project = this.getProject();
+    if (!project) throw new Error('먼저 기획 폴더를 선택해 주세요.');
+    const kind = selection?.kind;
+    const name = selection instanceof PlanningItem ? selection.resource : selection?.name;
+    if ((kind !== 'table' && kind !== 'document') || !name) throw new VibeError('INVALID_ARGUMENT', '복제할 표나 문서를 우클릭해 주세요.');
+    if (selection?.projectRoot && selection.projectRoot !== project.root) throw new VibeError('PROJECT_CHANGED', '기획 폴더가 바뀌었습니다.');
+    this.assertNoDraft(kind, name);
+    const input = selection instanceof PlanningItem ? undefined : selection;
+    const names = resourceEntries(project).filter(entry => kind === 'table' || entry.kind !== 'schema').map(entry => entry.name);
+    const to = input?.to ?? await vscode.window.showInputBox({ title: kind === 'table' ? '표 복제' : '문서 복제',
+      prompt: '새 이름을 입력하세요. 같은 폴더에 독립 복제본을 만듭니다. 기존 참조 대상은 유지합니다.',
+      value: suggestResourceName(name + '_복사본', names), validateInput: value => duplicateNameError(project, kind, value) });
+    if (to === undefined) return;
+    if (this.getProject()?.root !== project.root) throw new VibeError('PROJECT_CHANGED', '기획 폴더가 바뀌었습니다.');
+    this.assertNoDraft(kind, name);
+    const result = await duplicateResource(project.root, input?.revision ?? project.revision, kind, name, to);
+    await this.refresh();
+    if (this.getProject()?.root === project.root) await vscode.commands.executeCommand(kind === 'table' ? 'vibe.openTable' : 'vibe.openDocument', to);
+    return result;
+  }
   getTreeItem(item: PlanningItem) { return item; }
   private stateKey(root: string, folder: string) { return 'vibe.folderExpanded:' + JSON.stringify([root, folder]); }
   async setExpanded(item: PlanningItem, expanded: boolean) {

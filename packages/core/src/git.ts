@@ -58,7 +58,7 @@ async function optional(cwd: string, args: string[]): Promise<string | null> {
 }
 const split0 = (text: string) => text.split('\0').filter(Boolean);
 const managedRootFiles = ['.gitattributes', '.gitignore', '.vibe-spec.json', ...agentFiles.map(([path]) => path)];
-const managedPath = (path: string) => resourceEntry(path) !== undefined || /^plans\/[^/]+\/[^/]+\.yaml$/.test(path) ||
+const managedPath = (path: string) => resourceEntry(path) !== undefined ||
   /^(?:schemas|tables|documents)\/(?:[^/]+\/)*\.gitkeep$/.test(path) && !path.startsWith('documents/assets/') ||
   /^documents\/assets\/[^/]+\.(png|jpe?g|gif|webp)$/i.test(path) || /^imports\/[a-f0-9]{64}\.json$/.test(path) || managedRootFiles.includes(path);
 const temporaryPath = (path: string) => path === '.vibe-spec.lock' ||
@@ -95,14 +95,6 @@ async function managedFiles(root: string): Promise<string[]> {
     } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
   };
   for (const dir of ['schemas', 'tables', 'documents', 'imports']) await walk(dir);
-  try {
-    for (const plan of await readdir(join(root, 'plans'), { withFileTypes: true })) {
-      if (!plan.isDirectory()) continue;
-      for (const entry of await readdir(join(root, 'plans', plan.name), { withFileTypes: true })) {
-        if (entry.isFile() && entry.name.endsWith('.yaml')) paths.push('plans/' + plan.name + '/' + entry.name);
-      }
-    }
-  } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
   return paths.sort();
 }
 async function snapshot(root: string): Promise<Snapshot> {

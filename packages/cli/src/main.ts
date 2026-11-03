@@ -8,46 +8,39 @@ import {
   inspectImport, planImport, applyImport,
   exportMarkdown, inspectSource,
   getGitStatus, saveProject, pushProject, pullProject, resolveProject,
-  listPlans, getPlan, readVariant, createPlan, writeVariant, setPlanStatus, approvePlan,
-  getTargetDocumentView, editVariantDocument,
   listDocuments, getDocumentView, createDocument, editDocument, deleteDocument, addDocumentImage,
-  applyFolderEdit, listFolders,
+  applyFolderEdit, listFolders, duplicateResource,
 } from '@vibe-spec/core';
-import type { Diagnostic, DocumentOperation, EditOperation, FolderOperation, GitChoice, GitResult, GitStatus, ImportMapping, ImportPlan, PlanDefinition, Project, RenameKind, VariantInput, WriteResult } from '@vibe-spec/core';
-import { classify, isWrite, parseCommandLine, validateInvocation, variantTarget } from './commands.js';
+import type { Diagnostic, DocumentOperation, EditOperation, FolderOperation, GitChoice, GitResult, GitStatus, ImportMapping, ImportPlan, Project, RenameKind, WriteResult } from '@vibe-spec/core';
+import { classify, isWrite, parseCommandLine, validateInvocation } from './commands.js';
 import type { CommandName, Invocation, Values } from './commands.js';
 
 const usage = `Usage:
   vibe init <folder> [--json]
-  vibe read <table-or-path> [--target base|<plan>/<variant>] [--project <folder>] [--json]
+  vibe read <table-or-path> [--target base] [--project <folder>] [--json]
   vibe document list [--project <folder>] [--json]
-  vibe document read <name> [--target base|<plan>/<variant>] [--project <folder>] [--json]
-  vibe document create <name> [--folder <path>] --input <markdown-file> --target base --expect-revision <revision> [--dry-run] [--project <folder>] [--json]
-  vibe document edit <name> --input <operations-json> --target base|<plan>/<variant> --expect-revision <revision> [--dry-run] [--project <folder>] [--json]
-  vibe document delete <name> --target base --expect-revision <revision> [--dry-run] [--project <folder>] [--json]
-  vibe document image <input-file> --target base --expect-revision <revision> [--dry-run] [--project <folder>] [--json]
+  vibe document read <name> [--target base] [--project <folder>] [--json]
+  vibe document create <name> [--folder <path>] --input <markdown-file> --expect-revision <revision> [--dry-run] [--project <folder>] [--json]
+  vibe document edit <name> --input <operations-json> --expect-revision <revision> [--dry-run] [--project <folder>] [--json]
+  vibe document delete <name> --expect-revision <revision> [--dry-run] [--project <folder>] [--json]
+  vibe document image <input-file> --expect-revision <revision> [--dry-run] [--project <folder>] [--json]
   vibe folder list [--project <folder>] [--json]
-  vibe folder create <path> --target base --expect-revision <revision> [--dry-run] [--project <folder>] [--json]
-  vibe folder rename <path> --to <name> --target base --expect-revision <revision> [--dry-run] [--project <folder>] [--json]
-  vibe folder move <path> --folder <path> --target base --expect-revision <revision> [--dry-run] [--project <folder>] [--json]
-  vibe folder delete <path> --target base --expect-revision <revision> [--dry-run] [--project <folder>] [--json]
-  vibe move <table|document> <name> --folder <path> --target base --expect-revision <revision> [--dry-run] [--project <folder>] [--json]
-  vibe plan list [--project <folder>] [--json]
-  vibe plan read <name> [--project <folder>] [--json]
-  vibe plan create <name> --input <definition-json> --expect-revision <revision> [--dry-run] [--project <folder>] [--json]
-  vibe plan variant <plan>/<variant> --input <variant-json> --expect-revision <revision> [--dry-run] [--project <folder>] [--json]
-  vibe plan status <name> --to draft|review --expect-revision <revision> [--dry-run] [--project <folder>] [--json]
-  vibe plan approve <plan>/<variant> --expect-revision <revision> [--dry-run] [--project <folder>] [--json]
+  vibe folder create <path> --expect-revision <revision> [--dry-run] [--project <folder>] [--json]
+  vibe folder rename <path> --to <name> --expect-revision <revision> [--dry-run] [--project <folder>] [--json]
+  vibe folder move <path> --folder <path> --expect-revision <revision> [--dry-run] [--project <folder>] [--json]
+  vibe folder delete <path> --expect-revision <revision> [--dry-run] [--project <folder>] [--json]
+  vibe move <table|document> <name> --folder <path> --expect-revision <revision> [--dry-run] [--project <folder>] [--json]
   vibe validate [--project <folder>] [--json]
   vibe fmt [--check] [--project <folder>] [--json]
   vibe export [--output <folder>] [--project <folder>] [--json]
-  vibe edit --target base --input <json-file> --expect-revision <revision> [--dry-run] [--project <folder>] [--json]
-  vibe apply --target base --input <json-array-file> --expect-revision <revision> [--dry-run] [--project <folder>] [--json]
-  vibe rename <key|table|column|schema|document|heading|tag> <path> --target base --to <name> --expect-revision <revision> [--dry-run] [--project <folder>] [--json]
+  vibe edit --input <json-file> --expect-revision <revision> [--dry-run] [--project <folder>] [--json]
+  vibe apply --input <json-array-file> --expect-revision <revision> [--dry-run] [--project <folder>] [--json]
+  vibe duplicate <table|document> <name> --to <new-name> --expect-revision <revision> [--dry-run] [--project <folder>] [--json]
+  vibe rename <key|table|column|schema|document|heading|tag> <path> --to <name> --expect-revision <revision> [--dry-run] [--project <folder>] [--json]
   vibe where-used <path> [--project <folder>] [--json]
   vibe import inspect <file> [--json]
   vibe import plan <file> --mapping <mapping-json> [--project <folder>] [--json]
-  vibe import apply --target base --input <plan-json> --expect-revision <revision> [--project <folder>] [--json]
+  vibe import apply --input <plan-json> --expect-revision <revision> [--project <folder>] [--json]
   vibe source inspect <csv|tsv|xlsx|notion.zip> [--json]
   vibe status [--project <folder>] [--json]
   vibe save --reason <text> [--expect-revision <revision>] [--project <folder>] [--json]
@@ -56,8 +49,7 @@ const usage = `Usage:
   vibe pull --resolve <choices-json> --expect-revision <revision> [--project <folder>] [--json]
   vibe --help
 
-Baseline writes require --target base once plans exist. Variant writes use plan variant.
-Document and folder/move writes always require --target base. Folder paths are relative; an empty --folder means the top level. Public resource names never include folders.
+--target base is optional legacy compatibility; alternative targets are no longer supported. Folder paths are relative; an empty --folder means the top level. Public resource names never include folders.
 For table-create operations, edit accepts --folder <path> (or folder in the input operation). Document edit takes an array of replace {block, markdown}, insert {before, markdown}, or delete {block} operations, each with an op field.
 Block indices and ranges are zero-based and valid only for the read revision; never rewrite the whole Markdown document.
 Exit codes: 0 success (including warnings), 1 validation errors, unresolved conflicts or formatting needed, 2 command failure.`;
@@ -130,9 +122,8 @@ const git: Handler = async (run, { command, values }) => {
 };
 
 // Commands on a loaded planning folder.
-const read: ProjectHandler = (run, { sub, selectedTarget }, project) => {
-  const view = selectedTarget === 'base' ? project : readVariant(project, ...variantTarget(selectedTarget!));
-  run.data = readPath(view, sub!);
+const read: ProjectHandler = (run, { sub }, project) => {
+  run.data = readPath(project, sub!);
 };
 const folderWrite: ProjectHandler = async (run, { command, sub, positionals, values }, project) => {
   const revision = requireRevision(values, 'read or validate');
@@ -153,10 +144,10 @@ const folder: ProjectHandler = (run, inv, project) => {
   if (inv.sub !== 'list') return folderWrite(run, inv, project);
   run.data = listFolders(project);
 };
-const document: ProjectHandler = async (run, { sub, positionals, values, selectedTarget }, project) => {
+const document: ProjectHandler = async (run, { sub, positionals, values }, project) => {
   const name = positionals[2]!;
   if (sub === 'list') { run.data = listDocuments(project); return; }
-  if (sub === 'read') { run.data = getTargetDocumentView(project, name, selectedTarget); return; }
+  if (sub === 'read') { run.data = getDocumentView(project, name); return; }
   const revision = requireRevision(values, 'document read or validate');
   const options = { dryRun: isDryRun(values) };
   if (sub === 'image') {
@@ -176,32 +167,15 @@ const document: ProjectHandler = async (run, { sub, positionals, values, selecte
       result = await createDocument(project.root, revision, name, markdown, { ...options, ...(values.folder !== undefined ? { folder: values.folder } : {}) });
     } else {
       const operations = await readJson(values.input) as DocumentOperation[];
-      result = selectedTarget === 'base' ? await editDocument(project.root, revision, name, operations, options)
-        : await editVariantDocument(project.root, revision, name, selectedTarget!, operations, options);
+      result = await editDocument(project.root, revision, name, operations, options);
     }
   }
   recordWrite(run, result, options.dryRun);
 };
-const plan: ProjectHandler = async (run, { sub, positionals, values }, project) => {
-  const name = positionals[2]!;
-  if (sub === 'list') { run.data = listPlans(project); return; }
-  if (sub === 'read') { run.data = getPlan(project, name); return; }
-  const revision = requireRevision(values, 'read');
-  const options = { dryRun: isDryRun(values) };
-  let result: WriteResult;
-  if (sub === 'create' || sub === 'variant') {
-    if (!values.input) throw new VibeError('INVALID_ARGUMENT', 'Supply --input <json-file>.');
-    const input = await readJson(values.input);
-    result = sub === 'create'
-      ? await createPlan(project.root, revision, name, input as PlanDefinition, options)
-      : await writeVariant(project.root, revision, ...variantTarget(name), input as VariantInput, options);
-  } else if (sub === 'status') {
-    if (values.to !== 'draft' && values.to !== 'review') throw new VibeError('INVALID_ARGUMENT', 'Supply --to draft|review; approve a selected variant with plan approve.');
-    result = await setPlanStatus(project.root, revision, name, values.to, options);
-  } else {
-    result = await approvePlan(project.root, revision, ...variantTarget(name), options);
-  }
-  recordWrite(run, result, options.dryRun);
+const duplicate: ProjectHandler = async (run, { sub, positionals, values }, project) => {
+  if (!values.to) throw new VibeError('INVALID_ARGUMENT', 'Supply --to <new name>.');
+  recordWrite(run, await duplicateResource(project.root, requireRevision(values, 'read or validate'),
+    sub as 'table' | 'document', positionals[2]!, values.to, { dryRun: isDryRun(values) }), isDryRun(values));
 };
 const whereUsedCommand: ProjectHandler = async (run, { sub }, project) => { run.data = await whereUsed(project, sub!); };
 const exportCommand: ProjectHandler = async (run, { values }, project) => {
@@ -220,10 +194,7 @@ const importPlan: ProjectHandler = async (run, { positionals, values }, project)
 /** edit, apply, rename and import apply: writes to the baseline. */
 const baselineWrite: ProjectHandler = async (run, inv, project) => {
   const { command, sub, positionals, values } = inv;
-  if (values.target === undefined && [...project.sources.keys()].some(path => path.startsWith('plans/'))) {
-    inv.selectedTarget = undefined;
-    throw new VibeError('TARGET_REQUIRED', 'Plans exist. Supply --target base to edit the baseline, or use plan variant <plan>/<variant>.');
-  }
+
   const revision = requireRevision(values, 'read');
   const dryRun = isDryRun(values);
   let result: WriteResult;
@@ -273,7 +244,7 @@ const handlers: Record<CommandName, Handler> = {
   init, source, status: git, save: git, push: git, pull: git,
   import: (run, inv) => inv.sub === 'inspect' ? importInspect(run, inv) : withProject(inv.sub === 'plan' ? importPlan : baselineWrite)(run, inv),
   read: withProject(read), folder: withProject(folder), move: withProject(folderWrite),
-  document: withProject(document), plan: withProject(plan),
+  document: withProject(document), duplicate: withProject(duplicate),
   validate: withProject(() => {}), fmt: withProject(fmt), export: withProject(exportCommand), 'where-used': withProject(whereUsedCommand),
   edit: withProject(baselineWrite), apply: withProject(baselineWrite), rename: withProject(baselineWrite),
 };

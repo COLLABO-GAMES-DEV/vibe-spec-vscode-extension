@@ -7,27 +7,25 @@ import { fileURLToPath } from 'node:url';
 import {
   applyEdits, applyTableWrite, assertTableColumnOperation, parseTableWrite, getTableView, loadProject, VibeError,
   resolveReference, ScreenHistory, whereUsed,
-  inspectStructure, deletionUsages, applyFolderEdit, createDocument, addDocumentImage, resourceEntries,
+  inspectStructure, deletionUsages, applyFolderEdit, createDocument, addDocumentImage, resourceEntries, duplicateResource,
 } from '@vibe-spec/core';
 import type { StructureOperation, Usages } from '@vibe-spec/core';
 import type { Plugin } from 'vite';
 import { createImportServer } from './importServer.js';
 import { createGitServer } from './gitServer.js';
 import { createTablesServer } from './tablesServer.js';
-import { createPlansServer } from './plansServer.js';
 
 export function fakeHostServer(): Plugin {
   let root: string;
   const imports = createImportServer(() => root);
   const git = createGitServer(() => root);
   const tableEditor = createTablesServer(() => root);
-  const plans = createPlansServer(() => root);
   const documents = createDocumentsServer(() => root);
   const histories = new Map<string, ScreenHistory>();
   const usageResults = new Map<string, Usages>();
   const fixture = fileURLToPath(new URL('../../core/test/fixtures/project/', import.meta.url));
   async function reset() {
-    histories.clear(); usageResults.clear(); imports.reset(); tableEditor.reset(); plans.reset(); documents.reset(); await git.reset();
+    histories.clear(); usageResults.clear(); imports.reset(); tableEditor.reset(); documents.reset(); await git.reset();
     if (root) await rm(root, { recursive: true, force: true, maxRetries: 3 });
     root = await mkdtemp(join(tmpdir(), 'vibe browser 한글-'));
     await cp(fixture, root, { recursive: true });
@@ -73,11 +71,13 @@ export function fakeHostServer(): Plugin {
             response.end(JSON.stringify({ revision: project.revision, resources: resourceEntries(project),
               sources: Object.fromEntries(project.sources) })); return;
           }
+          if (url.pathname === '/__vibe/duplicate' && request.method === 'POST') {
+            const result = await duplicateResource(root, String(body.revision), body.kind as 'table' | 'document', String(body.name), String(body.to));
+            response.end(JSON.stringify({ revision: result.project.revision, changed: result.changed, diagnostics: result.diagnostics })); return;
+          }
           if (url.pathname === '/__vibe/tables') { response.end(JSON.stringify(await tableEditor.handle(body))); return; }
           if (url.pathname === '/__vibe/documents') { response.end(JSON.stringify(await documents.handle(body))); return; }
-          if (url.pathname === '/__vibe/documents/fixture') { response.end(JSON.stringify(await documents.fixture(typeof body.source === 'string' ? body.source : undefined, body.variants === true))); return; }
-          if (url.pathname === '/__vibe/plans') { response.end(JSON.stringify(await plans.handle(body))); return; }
-          if (url.pathname === '/__vibe/plans/fixture') { response.end(JSON.stringify(await plans.fixture())); return; }
+          if (url.pathname === '/__vibe/documents/fixture') { response.end(JSON.stringify(await documents.fixture(typeof body.source === 'string' ? body.source : undefined))); return; }
           if (url.pathname === '/__vibe/git' || url.pathname === '/__vibe/git/fixture') {
             response.end(JSON.stringify(await git.handle(body, url.pathname.endsWith('/fixture')))); return;
           }

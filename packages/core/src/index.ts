@@ -26,8 +26,6 @@ export type { MarkdownExport } from './export.js';
 export type { MutationOptions } from './types.js';
 export { inspectSource } from './source.js';
 export type { SourceCell, SourceSheet, SpreadsheetSource, NotionSource, SourceInspection } from './source-types.js';
-export type { PlanStatus, PlanDefinition, VariantInput, Variant, PlanSummary, PlanValue, PlanComparison, PlanView } from './plan-types.js';
-export { listPlans, getPlan, readVariant, createPlan, writeVariant, setPlanStatus, approvePlan } from './plans.js';
 
 export type { DocumentBlock, DocumentLink, ParsedDocument, DocumentView, DocumentSummary, DocumentOperation, DocumentSnapshotBlock, DocumentSnapshot } from './document-types.js';
 export { parseMarkdown } from './document-parser.js';
@@ -41,9 +39,7 @@ export type { ResourceKind, ResourceEntry } from './resources.js';
 export type { FolderOperation } from './folder-types.js';
 export { applyFolderEdit } from './folders.js';
 
-export { documentScope, documentScopes, documentVariantChanges } from './document-variants.js';
-export type { DocumentScope } from './document-variants.js';
-export { getTargetDocumentView, saveTargetDocumentSnapshots, editVariantDocument } from './document-targets.js';
-export type { TargetDocumentView, TargetDocumentSnapshot } from './document-targets.js';
 export { pathParts, pathFromParts, appendPath, pathContains, canonicalPath } from './paths.js';
 export { folderNameError, folderAddress, folderStorage } from './folder-names.js';
+export { duplicateResource, duplicateNameError } from './duplicate.js';
+export type { DuplicateKind } from './duplicate.js';

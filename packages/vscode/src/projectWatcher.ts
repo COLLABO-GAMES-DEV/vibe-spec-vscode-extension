@@ -8,7 +8,7 @@ import { join } from 'node:path';
 export function watchProject(root: string, changed: () => void, failed: (error: Error) => void) {
   const watchers = new Map<string, { watcher: FSWatcher; identity: string }>();
   let disposed = false;
-  const managed = new Set(['schemas', 'tables', 'documents', 'imports', 'plans']);
+  const managed = new Set(['schemas', 'tables', 'documents', 'imports']);
   function reconcile() {
     if (disposed) return;
     const present = new Set<string>();

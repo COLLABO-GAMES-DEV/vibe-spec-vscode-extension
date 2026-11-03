@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promis
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { Diagnostic, PlanView, Table, Usages } from '@vibe-spec/core';
+import type { Diagnostic, Table, Usages } from '@vibe-spec/core';
 import { afterEach, expect, it } from 'vitest';
 
 const entry = fileURLToPath(new URL('../dist/main.js', import.meta.url));
@@ -59,7 +59,7 @@ function keys(root: string, target?: string) {
 }
 afterEach(async () => { for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true }); });
 
-it('real Node CLI keeps integer Key order/bytes through fmt and dry-run, then renames refs and A/B paths', {
+it('real Node CLI keeps integer Key order/bytes through fmt and dry-run, then renames refs and document paths', {
   timeout: process.platform === 'win32' ? 120_000 : 60_000,
 }, async () => {
   const root = await fixture();
@@ -73,16 +73,9 @@ it('real Node CLI keeps integer Key order/bytes through fmt and dry-run, then re
   expect(cli(root, ['fmt'])).toMatchObject({ status: 0, reply: { data: { changed: [] } } });
   expect(await snapshot(root)).toEqual(formatted);
 
-  expect(await write(root, ['plan', 'create', 'review'], { title: 'Levels', status: 'review' })).toMatchObject({ status: 0 });
-  for (const variant of ['A', 'B']) {
-    expect(await write(root, ['plan', 'variant', 'review/' + variant], {
-      set: { 'levels/1/note': variant + ' original 1', 'quests/first/level': '1' },
-      sources: [{ raw: '1', path: 'levels/1' }],
-    })).toMatchObject({ status: 0 });
-  }
   const used = cli<Usages>(root, ['where-used', 'levels/1']);
   expect(used.status).toBe(0);
-  for (const file of ['tables/quests.yaml', 'documents/guide.md', 'plans/review/A.yaml', 'plans/review/B.yaml']) {
+  for (const file of ['tables/quests.yaml', 'documents/guide.md']) {
     expect(used.reply.data.references).toEqual(expect.arrayContaining([expect.objectContaining({ file })]));
   }
   expect(cli<Usages>(root, ['where-used', 'levels/001']).reply.data.references).toEqual([]);
@@ -94,7 +87,7 @@ it('real Node CLI keeps integer Key order/bytes through fmt and dry-run, then re
   expect(preview.reply.error).toBeUndefined();
   expect(preview).toMatchObject({ status: 0, reply: { revision: expected, data: { applied: false } } });
   expect(preview.reply.data.planned).toEqual(expect.arrayContaining([
-    'tables/levels.yaml', 'tables/quests.yaml', 'documents/guide.md', 'plans/review/A.yaml', 'plans/review/B.yaml',
+    'tables/levels.yaml', 'tables/quests.yaml', 'documents/guide.md',
   ]));
   expect(preview.reply.data.preview['tables/levels.yaml']).toBe(tableBefore.toString().replace('level: "1"', 'level: "3"'));
   expect(await snapshot(root)).toEqual(before);
@@ -104,19 +97,6 @@ it('real Node CLI keeps integer Key order/bytes through fmt and dry-run, then re
   expect(cli(root, ['read', 'quests/first/level']).reply.data).toEqual({ present: true, value: '3' });
   expect(cli(root, ['read', 'levels/1']).reply.error?.code).toBe('PATH_NOT_FOUND');
   expect(await readFile(join(root, 'documents/guide.md'), 'utf8')).toBe('# Levels\n\n[Level](levels/3) and [note](levels/3/note).\n');
-  const plan = cli<PlanView>(root, ['plan', 'read', 'review']);
-  expect(plan.status).toBe(0);
-  for (const variant of ['A', 'B']) {
-    expect(plan.reply.data.variants[variant]).toMatchObject({
-      set: { 'levels/3/note': variant + ' original 1', 'quests/first/level': '3' },
-      base_values: { 'levels/3/note': 'Level 1', 'quests/first/level': '3' },
-      sources: [{ raw: '1', path: 'levels/1' }],
-    });
-    expect(plan.reply.data.variants[variant]!.set).not.toHaveProperty('levels/1/note');
-    expect(keys(root, 'review/' + variant)).toEqual(['10', '2', '3', '001']);
-    expect(cli(root, ['read', 'levels/3/note', '--target', 'review/' + variant]).reply.data)
-      .toEqual({ present: true, value: variant + ' original 1' });
-  }
   const after = await snapshot(root);
   expect(cli(root, ['fmt'])).toMatchObject({ status: 0, reply: { data: { changed: [] } } });
   expect(await snapshot(root)).toEqual(after);

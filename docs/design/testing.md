@@ -30,10 +30,6 @@
 
 도구 근거: [VS Code 확장 테스트](https://code.visualstudio.com/api/working-with-extensions/testing-extension), [Playwright](https://playwright.dev/docs/intro).
 
-## 최소 2단계
+## 복제와 자유 편집
 
-기준안 단독과 각 대안의 참조·유일성, 공통 변경 상속, 이전/현재/대안 값 경고, 행 삭제 후 오류, 이름 변경의 보관본 갱신을 core와 CLI에서 확인한다. 확정은 선택한 변경만 합치고 모든 대안 파일을 보관한다. 화면은 기준안/A/B 비교·상태·확정·오래된 revision 거절을 검사한다. 실제 사업 판단은 시험으로 대신 확정하지 않으며, 원본 충돌은 컨펌 전으로 유지하고 독립 시험 기획에서 확정 흐름을 검증한다.
-
-문서 기능의 바이트 보존·블록 편집·링크·실전 이관 검사는 [문서 검사 계약](documents.md)을 따른다. 기존 Linux·Windows 실행 행렬에 함께 포함한다.
-
-도메인 회귀: 평면/중첩 기획 읽기·편집·rename·where-used·검증·이관·내보내기·Git 저장/병합, 이동 전후 YAML/Markdown 바이트와 참조 동일, 전역 이름 충돌·Windows 폴더 이름·빈 폴더 보존·비어 있지 않은 삭제·stale·심볼릭 링크 경계. Playwright는 하위 폴더 데이터의 표/문서 편집·연결, 실제 VS Code는 단일 트리·폴더 메뉴·접힘 유지·하위 파일 감시를 검증한다. 검사 범위는 유지하고 실행 시점은 위 정책을 따른다.
+[복제 계약](comparison.md)의 원문 보존·독립 스키마·기존 링크 대상 유지·초안 보호·이전 plans/ 파일 보존을 core/CLI와 화면·실제 VS Code에서 검사한다. 문서 무변경 저장과 부분 수정 바깥 원문 보존 검사를 유지한다.

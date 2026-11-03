@@ -136,7 +136,7 @@ it('imports into a nested destination and rejects unsafe or stale folder writes 
     expect(rejected.revision).toBe(revision);
     expect(rejected.data).toMatchObject({ applied: false, changed: [] });
   }
-  expect(cli(root, ['folder', 'create', 'new', '--expect-revision', revision], 2).error?.code).toBe('TARGET_REQUIRED');
+  expect(cli(root, ['folder', 'create', 'new', '--target', 'review/A', '--expect-revision', revision], 2).error?.code).toBe('INVALID_ARGUMENT');
   expect(cli(root, ['folder', 'create', 'new', '--target', 'base'], 2).error?.code).toBe('REVISION_REQUIRED');
   expect(cli(root, ['folder', 'create', 'new', '--target', 'base', '--expect-revision', 'stale'], 2).error?.code).toBe('STALE_REVISION');
   cli(root, ['folder', 'list', '--dry-run'], 2);

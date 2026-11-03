@@ -4,7 +4,6 @@ import { join } from 'node:path';
 import { afterEach, expect, it } from 'vitest';
 import { applyEdits, renameResource } from '../src/editing.js';
 import { ScreenHistory } from '../src/history.js';
-import { approvePlan, createPlan, getPlan, readVariant, writeVariant } from '../src/plans.js';
 import { formattedSources, initProject, loadProject, readPath, writeChanges } from '../src/project.js';
 import type { EditOperation, Project, Table } from '../src/types.js';
 import { whereUsed } from '../src/usage.js';
@@ -81,65 +80,14 @@ it('keeps original integer spellings as distinct identities and matches referenc
   expect(validateProject(p)).toEqual(expect.arrayContaining([expect.objectContaining({ code: 'REF_MISSING', path: 'quests/first/level' })]));
 });
 
-it('renames integer paths, refs, document links and active/archived A/B captures, then composes in source order', async () => {
+it('renames integer paths, refs, document links while preserving source order', async () => {
   let p = await fixture();
-  for (const plan of ['live', 'archive']) {
-    p = (await createPlan(p.root, p.revision, plan, { title: plan, status: 'review' })).project;
-    for (const variant of ['A', 'B']) {
-      p = (await writeVariant(p.root, p.revision, plan, variant, {
-        set: { 'levels/1/note': variant + ' Level 1', 'quests/first/level': '1' },
-        ...(plan === 'live' ? { add: { 'levels/0': { note: 'Added 1' }, 'quests/live': { level: '1' } } } : {}),
-        sources: [{ raw: '1', path: 'levels/1' }],
-      })).project;
-    }
-  }
-  p = (await approvePlan(p.root, p.revision, 'archive', 'B')).project;
-  expect(getPlan(p, 'archive').plan.status).toBe('approved');
-  const used = await whereUsed(p, 'levels/1');
-  for (const plan of ['live', 'archive']) for (const variant of ['A', 'B']) {
-    expect(used.references).toEqual(expect.arrayContaining([expect.objectContaining({ file: `plans/${plan}/${variant}.yaml` })]));
-  }
   p = (await renameResource(p.root, p.revision, 'key', 'levels/1', '3')).project;
   expect(keys(p)).toEqual(['10', '2', '3']);
   expect(readPath(p, 'quests/first/level')).toEqual({ present: true, value: '3' });
   expect(await readFile(join(p.root, 'documents/guide.md'), 'utf8'))
     .toBe('# Levels\n\n[Row](levels/3) and [cell](levels/3/note). Level 1 stays prose.\n');
-  for (const plan of ['live', 'archive']) for (const variant of ['A', 'B']) {
-    const patch = getPlan(p, plan).variants[variant]!;
-    expect(patch.set).toEqual({ 'levels/3/note': variant + ' Level 1', 'quests/first/level': '3' });
-    if (plan === 'live') expect(patch.add!['quests/live']).toEqual({ level: '3' });
-    expect(patch.base_values['levels/3/note']).toBe('Level 1');
-    expect(patch.base_values['quests/first/level']).toBe('3');
-    expect(patch.base_values).not.toHaveProperty('levels/1/note');
-    expect(patch.sources).toEqual([{ raw: '1', path: 'levels/1' }]);
-    if (plan === 'live') {
-      const composed = readVariant(p, plan, variant);
-      expect(keys(composed)).toEqual(['10', '2', '3', '0']);
-      expect(readPath(composed, 'levels/3/note')).toEqual({ present: true, value: variant + ' Level 1' });
-      expect(readPath(composed, 'quests/live/level')).toEqual({ present: true, value: '3' });
-    }
-  }
   expect(validateProject(p).filter(item => item.severity !== 'warning')).toEqual([]);
-});
-
-it('renames integer remove addresses and captured row Keys in active and archived alternatives', async () => {
-  let p = await fixture();
-  for (const plan of ['live', 'archive']) {
-    p = (await createPlan(p.root, p.revision, plan, { title: plan, status: 'review' })).project;
-    p = (await writeVariant(p.root, p.revision, plan, 'A', { remove: ['levels/2'] })).project;
-    p = (await writeVariant(p.root, p.revision, plan, 'B', {})).project;
-  }
-  p = (await approvePlan(p.root, p.revision, 'archive', 'B')).project;
-  p = (await renameResource(p.root, p.revision, 'key', 'levels/2', '20')).project;
-  expect(keys(p)).toEqual(['10', '20', '1']);
-  for (const plan of ['live', 'archive']) {
-    const patch = getPlan(p, plan).variants.A!;
-    expect(patch.remove).toEqual(['levels/20']);
-    expect(patch.base_values).toEqual({ 'levels/20': { level: '20', note: 'Level 2' } });
-  }
-  expect(keys(readVariant(p, 'live', 'A'))).toEqual(['10', '1']);
-  expect(keys(readVariant(p, 'live', 'B'))).toEqual(['10', '20', '1']);
-  expect(validateProject(p)).toEqual([]);
 });
 
 it.each([false, true])('restores a deleted integer row in source order through undo/redo (external rows: %s)', async external => {

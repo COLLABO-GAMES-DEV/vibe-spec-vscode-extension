@@ -7,7 +7,6 @@ import { isScalar } from 'yaml';
 import { isRecord, validName, VibeError } from './types.js';
 import { resourceNameError, suggestResourceName } from './names.js';
 import type { Column, Diagnostic, Project, Table, TableSchema, YamlFile } from './types.js';
-import { validatePlans } from './plans.js';
 
 const ajv = new Ajv({ allErrors: true, ownProperties: true });
 const checkSchema = ajv.compile<TableSchema>({
@@ -176,11 +175,7 @@ function uniqueValue(value: unknown, column: Column): unknown {
 }
 
 export function validateProject(project: Project): Diagnostic[] {
-  return [...validateBaseline(project), ...validatePlans(project, validateBaseline)];
-}
-
-export function validateBaseline(project: Project): Diagnostic[] {
-  const errors = [...project.diagnostics.filter(item => !item.file.startsWith('plans/')), ...documentDiagnostics(project)];
+  const errors = [...project.diagnostics, ...documentDiagnostics(project)];
   for (const [path, file] of project.files) {
     if (path.startsWith('schemas/')) errors.push(...schemaDiagnostics(file));
     if (path.startsWith('tables/')) {

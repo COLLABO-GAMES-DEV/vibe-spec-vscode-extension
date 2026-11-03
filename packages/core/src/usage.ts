@@ -6,8 +6,6 @@ import { join } from 'node:path';
 import type { Diagnostic, Project, TableSchema, Usage, Usages } from './types.js';
 import { readPath } from './project.js';
 import { declaredReferences, schemaDiagnostics, tableContexts } from './validation.js';
-import { hasPlanAddedRow, planUsages } from './plan-references.js';
-import { VibeError } from './types.js';
 
 function add(list: Usage[], file: string, location: string, source: string, offset: number) {
   const line = source.slice(0, offset).split('\n').length;
@@ -73,19 +71,11 @@ export async function deletionUsages(project: Project, diagnostics: readonly Dia
 }
 
 export async function whereUsed(project: Project, path: string): Promise<Usages> {
-  try { readPath(project, path); }
-  catch (error) {
-    const parts = pathParts(path);
-    if (!(error instanceof VibeError) || error.code !== 'PATH_NOT_FOUND' || parts.length < 2 ||
-        !hasPlanAddedRow(project, pathFromParts(parts.slice(0, 2)))) throw error;
-    // Resolve table/column declarations even if the row exists only in an alternative.
-    readPath(project, parts.length === 3 ? parts[0] + '/*/' + parts[2] : parts[0]!);
-  }
+  readPath(project, path);
   if (resourceFile(project, 'document', pathParts(path)[0]!) !== undefined) {
-    const result = documentUsages(project, path), plans = planUsages(project, path);
-    result.references.push(...plans.references);
+    const result = documentUsages(project, path);
     result.candidates = [...(await textCandidates(project, pathParts(path).at(-1)!)).filter(candidate =>
-      resourceEntry(candidate.file)?.kind !== 'document' && !candidate.file.startsWith('plans/')), ...result.candidates, ...plans.candidates];
+      resourceEntry(candidate.file)?.kind !== 'document' && !candidate.file.startsWith('plans/')), ...result.candidates];
     return result;
   }
   const [table, key, column] = pathParts(path);
@@ -128,8 +118,7 @@ export async function whereUsed(project: Project, path: string): Promise<Usages>
       add(references, file.file, location.join('/'), file.source, node.range?.[0] ?? 0);
     }
   }
-  const plans = planUsages(project, path);
   const documents = documentUsages(project, path);
-  return { references: [...references, ...plans.references, ...documents.references],
-    candidates: [...candidates.filter(candidate => resourceEntry(candidate.file)?.kind !== 'document'), ...documents.candidates, ...plans.candidates] };
+  return { references: [...references, ...documents.references],
+    candidates: [...candidates.filter(candidate => resourceEntry(candidate.file)?.kind !== 'document'), ...documents.candidates] };
 }

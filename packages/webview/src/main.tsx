@@ -5,8 +5,6 @@ import { App } from './App';
 import { ImportApp } from './ImportApp';
 import { GitApp } from './GitApp';
 import { TablesApp } from './TablesApp';
-import { PlansApp } from './PlansApp';
-import type { PlansHost } from './plansProtocol';
 import type { TablesHost } from './tablesProtocol';
 import type { GitHost } from './gitProtocol';
 import type { Host } from './protocol';
@@ -30,7 +28,6 @@ async function start() {
   if (typeof acquireVsCodeApi === 'function') {
     const vscode = acquireVsCodeApi();
     if (mode === 'documents') root.render(<DocumentsApp host={bridge(vscode) as DocumentsHost} />);
-    else if (mode === 'plans') root.render(<PlansApp host={bridge(vscode) as PlansHost} />);
     else if (mode === 'tables') root.render(<TablesApp host={bridge(vscode) as TablesHost} />);
     else if (mode === 'git') root.render(<GitApp host={bridge(vscode) as GitHost} />);
     else if (mode === 'import') root.render(<ImportApp host={bridge(vscode) as ImportHost} />);
@@ -39,9 +36,6 @@ async function start() {
     if (mode === 'documents') {
       const { createFakeDocumentsHost } = await import('../dev/documentsHost');
       root.render(<DocumentsApp host={createFakeDocumentsHost()} />);
-    } else if (mode === 'plans') {
-      const { createFakePlansHost } = await import('../dev/plansHost');
-      root.render(<PlansApp host={createFakePlansHost()} />);
     } else if (mode === 'tables') {
       const { createFakeTablesHost } = await import('../dev/tablesHost');
       root.render(<TablesApp host={createFakeTablesHost()} />);

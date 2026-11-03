@@ -248,7 +248,7 @@ suite('vibe-spec documents in native VS Code', function () {
     const views = manifest.contributes.views.vibe as { id: string; name: string }[];
     assert.deepEqual(views.filter(view => view.id === 'vibe.tables'), [{ id: 'vibe.tables', name: '기획' }]);
     assert.ok(!views.some(view => /document/i.test(view.id)));
-    assert.ok(views.some(view => view.id === 'vibe.plans'));
+    assert.ok(!views.some(view => view.id === 'vibe.plans'));
     assert.ok(views.some(view => view.id === 'vibe.errors'));
     const menus = manifest.contributes.menus['view/item/context'] as { command: string; when: string }[];
     for (const command of ['vibe.newDocument', 'vibe.newTable']) assert.ok(menus.some(menu =>

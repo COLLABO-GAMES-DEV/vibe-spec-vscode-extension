@@ -8,7 +8,6 @@ import { webviewHtml } from './webview.js';
 import { openImport } from './importPanel.js';
 import { GitController } from './gitController.js';
 import { TablesController } from './tablesController.js';
-import { PlansController } from './plansController.js';
 import {
   applyTableWrite, assertTableColumnOperation, compareResourceNames, getTableView, initProject, listTables, loadProject,
   resolveProjectRoot, selectPlanningRoot, validateProject, VibeError,
@@ -52,8 +51,13 @@ export async function activate(context: vscode.ExtensionContext) {
   const histories = new Map<string, ScreenHistory>();
   const usages = new Map<string, Usages>();
   const pendingFocus = new Map<string, { key: string; column: string; row?: boolean }>();
+  const tableDrafts = new Set<string>();
   const refreshed = new vscode.EventEmitter<void>();
-  const tables = new PlanningTree(context, () => project, refresh);
+  const tables = new PlanningTree(context, () => project, refresh, (kind, name) => {
+    if (kind === 'table' ? tableDrafts.has(name) : project && documents.hasUnsavedDraft(project.root, name)) {
+      throw new VibeError('UNSAVED_DRAFT', '복제하기 전에 원본의 초안을 저장·확정하거나 버려 주세요. 복제는 저장된 파일을 사용합니다.');
+    }
+  });
   const errors = new ErrorTree(() => project);
   const errorView = vscode.window.createTreeView('vibe.errors', { treeDataProvider: errors });
   const log = vscode.window.createOutputChannel('vibe-spec');
@@ -62,8 +66,6 @@ export async function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(git);
   const tableEditor = new TablesController(context, getProject, refresh, openTable, name => panels.get(name)?.dispose(), input => tables.selectedFolder(input));
   context.subscriptions.push(tableEditor);
-  const plans = new PlansController(context, getProject, refresh);
-  context.subscriptions.push(plans);
   const documents = new DocumentsController(context, getProject, refresh, async path => {
     if (project && resourceFile(project, 'document', pathParts(path)[0]!)) {
       await documents.open(pathParts(path)[0], path); return;
@@ -111,7 +113,7 @@ export async function activate(context: vscode.ExtensionContext) {
       const next = await loadProject(planningRoot);
       if (ticket !== generation) return;
       project = next;
-      tables.update(); errors.update(); plans.refresh();
+      tables.update(); errors.update();
       const diagnostics = validateProject(next);
       errorView.title = '검증 오류 (' + diagnostics.filter(diagnostic => diagnostic.severity !== 'warning').length
         + ') · 경고 (' + diagnostics.filter(diagnostic => diagnostic.severity === 'warning').length + ')';
@@ -123,7 +125,7 @@ export async function activate(context: vscode.ExtensionContext) {
     } catch (error) {
       if (ticket !== generation) return;
       project = undefined;
-      tables.update(); errors.update(); plans.refresh();
+      tables.update(); errors.update();
       errorView.title = '검증 오류 — 폴더 확인 필요';
       for (const panel of panels.values()) post(panel, { type: 'error', code: 'PROJECT_UNAVAILABLE', message: (error as Error).message });
       log.appendLine((error as Error).message);
@@ -179,7 +181,7 @@ export async function activate(context: vscode.ExtensionContext) {
     });
     panels.set(table, panel);
     panel.webview.html = webviewHtml(context, panel, 'table');
-    panel.onDidDispose(() => { panels.delete(table); pendingFocus.delete(table); histories.delete(table); usages.delete(table); git.draft(table, false); });
+    panel.onDidDispose(() => { panels.delete(table); pendingFocus.delete(table); histories.delete(table); usages.delete(table); tableDrafts.delete(table); git.draft(table, false); });
     panel.webview.onDidReceiveMessage(async (message: ClientMessage) => {
       if (!message || typeof message !== 'object') return;
       if (message.type === 'ready') {
@@ -191,7 +193,7 @@ export async function activate(context: vscode.ExtensionContext) {
       }
       if (!project) return;
       if (project.root !== panelRoot || planningRoot !== panelRoot) return;
-      if (message.type === 'draftState') { git.draft(table, message.active); return; }
+      if (message.type === 'draftState') { if (message.active) tableDrafts.add(table); else tableDrafts.delete(table); git.draft(table, message.active); return; }
       try {
         if (message.type === 'copy') {
           await vscode.env.clipboard.writeText(message.text);
@@ -297,7 +299,7 @@ export async function activate(context: vscode.ExtensionContext) {
       generation++;
       planningRoot = undefined; project = undefined; clearTimeout(timer); watcher?.dispose();
       for (const panel of panels.values()) panel.dispose();
-      tables.update(); errors.update(); plans.refresh();
+      tables.update(); errors.update();
       log.appendLine((error as Error).message);
       await git.refresh();
       void documents.refresh();
@@ -355,11 +357,11 @@ export async function activate(context: vscode.ExtensionContext) {
       );
       return result;
     }),
-    register('vibe.openTable', openTable), register('vibe.openPlan', (name?: string) => plans.open(name)),
+    register('vibe.openTable', openTable),
     register('vibe.openError', openError), register('vibe.refresh', refresh),
     vscode.workspace.onDidChangeWorkspaceFolders(() => { void workspaceFoldersChanged(); }),
     { dispose() { clearTimeout(timer); watcher?.dispose(); configWatcher?.dispose(); for (const panel of panels.values()) panel.dispose(); } },
   );
   await workspaceFoldersChanged();
-  return { planning: tables, tables, errors, plans, documents, git, refresh, getProject, onDidRefresh: refreshed.event };
+  return { planning: tables, tables, errors, documents, git, refresh, getProject, onDidRefresh: refreshed.event };
 }

@@ -1,6 +1,5 @@
 import { newFolderMarkers } from './folder-names.js';
 import { pathParts, pathFromParts, canonicalPath } from './paths.js';
-import { renamePlanReferences } from './plan-references.js';
 import { resourceEntries, resourceEntry, resourceFile, resourcePath } from './resources.js';
 import type { Heading } from 'mdast';
 import type { Diagnostic, MutationOptions, Project, WriteResult } from './types.js';
@@ -8,7 +7,7 @@ import { isRecord, VibeError } from './types.js';
 import type { DocumentBlock, DocumentOperation, DocumentSnapshot, DocumentSummary, DocumentView, ParsedDocument } from './document-types.js';
 import { markdownTree, nameComment, nodeEnd, nodeStart, parseMarkdown } from './document-parser.js';
 import { documentPathMatches, documentSources, documentUsages, renameDocumentLinks, rewriteDocumentPaths } from './document-references.js';
-import { mutateProject, projectWithChanges, readPath } from './project.js';
+import { mutateProject, readPath } from './project.js';
 import { compareResourceNames, resourceNameError, resourceNameKey, suggestResourceName } from './names.js';
 import { textCandidates } from './usage.js';
 import { checkMarkdownSource as checkSource, composeDocumentSnapshot } from './document-snapshot.js';
@@ -258,9 +257,6 @@ export function prepareDocumentSnapshots(before: Project, snapshots: DocumentSna
   if (renamed.length) {
     for (const [file, source] of rewriteDocumentPaths(composed, renamePath)) changes.set(file, source);
   }
-  for (const rename of renamed) {
-    for (const [file, value] of renamePlanReferences(projectWithChanges(before, changes), rename.kind, rename.path, rename.to)) changes.set(file, value);
-  }
   return changes;
 }
 
@@ -335,9 +331,6 @@ export async function editDocument(
     if (renamed.length) {
       for (const [file, value] of rewriteDocumentPaths(withSource(before, name, source), renamePath)) changes.set(file, value);
     }
-    for (const rename of renamed) {
-      for (const [file, value] of renamePlanReferences(projectWithChanges(before, changes), rename.kind, rename.path, rename.to)) changes.set(file, value);
-    }
     return changes;
   }, options);
 }
@@ -368,7 +361,6 @@ export async function renameDocument(
       checkName(before, to, name);
       candidates = await textCandidates(before, name);
       for (const [file, source] of renameDocumentLinks(before, kind, path, to)) changes.set(file, source);
-      for (const [file, source] of renamePlanReferences(before, kind, path, to)) changes.set(file, source);
       const renamedSource = changes.get(fileOf(before, name)) ?? parsed.source;
       changes.delete(fileOf(before, name));
       changes.set(resourcePath('document', to, resourceEntry(fileOf(before, name))!.folder), renamedSource);
@@ -396,7 +388,6 @@ export async function renameDocument(
     const source = spliceSource(parsed.source, [edit]);
     changes.set(fileOf(before, name), source);
     for (const [file, value] of renameDocumentLinks(withSource(before, name, source), kind, path, to)) changes.set(file, value);
-    for (const [file, value] of renamePlanReferences(before, kind, path, to)) changes.set(file, value);
     return changes;
   }, options);
   return { ...result, candidates };

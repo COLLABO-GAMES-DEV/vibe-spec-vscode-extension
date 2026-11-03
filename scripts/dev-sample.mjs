@@ -84,19 +84,8 @@ try {
     '## 판매 규칙', '', '- 판매 중인 상품만 노출합니다.', '- 별빛 검은 이벤트 기간에만 판매합니다.', '',
   ].join('\n'), '.md'));
 
-  // 기획 A/B 비교: 같은 기준안 위의 대등한 두 안
-  write('plan', 'create', 'starter-price', '--input', input({
-    title: '스타터 팩 가격 검토', status: 'review', question: '스타터 팩 가격과 구성을 어느 안으로 정할까요?',
-  }));
-  write('plan', 'variant', 'starter-price/A', '--input', input({
-    set: { 'offers/starter_pack/price': '150', 'offers/starter_pack/count': '12' },
-    documents: { '상점 안내/상점 안내/스타터 팩': '## 스타터 팩\n\nA안: 수량을 12개로 늘리고 가격을 150 보석으로 올립니다.' },
-  }));
-  write('plan', 'variant', 'starter-price/B', '--input', input({
-    set: { 'offers/starter_pack/price': '99' },
-    add: { 'offers/starter_pack_plus': { item: 'potion_large', count: '3', currency: 'gem', price: '199', available: true } },
-    documents: { '상점 안내/상점 안내/스타터 팩': '## 스타터 팩\n\nB안: 가격을 99 보석으로 낮추고 큰 회복약 상위 상품을 추가합니다.' },
-  }));
+  // Independent copy for free editing.
+  write('duplicate', 'table', 'offers', '--to', 'offers_B');
 
   vibe('fmt', '--check', '--project', folder); // every write above must already be fmt-clean
   const validation = vibe('validate', '--project', folder);

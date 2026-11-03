@@ -107,22 +107,6 @@ async function readProject(root: string, previous?: Project): Promise<Project> {
     // A locked or disappearing child must retain its I/O error for the writer.
     await readDirectory(directory, entries);
   }
-  // Plans are added only when used. Git does not retain empty directories.
-  let plans;
-  try { plans = await readdir(join(root, 'plans'), { withFileTypes: true }); }
-  catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
-  for (const plan of plans ?? []) {
-    if (plan.isFile()) continue; // Unmanaged notes and OS files are not plan folders.
-    if (!plan.isDirectory()) throw new VibeError('FILE_UNSUPPORTED', 'Expected a plan directory: plans/' + plan.name);
-    for (const entry of await readdir(join(root, 'plans', plan.name), { withFileTypes: true })) {
-      if (!entry.name.endsWith('.yaml')) continue;
-      const file = 'plans/' + plan.name + '/' + entry.name;
-      if (!entry.isFile()) throw new VibeError('FILE_UNSUPPORTED', 'Expected a regular file: ' + file);
-      const source = await sourceAt(join(root, file));
-      sources.set(file, source);
-      parsed(file, source);
-    }
-  }
   for (const directory of ['documents/assets', 'imports']) {
     let entries;
     try {
@@ -183,24 +167,6 @@ function resourceDiagnostics(sources: ReadonlyMap<string, string>, directories: 
     result.push({ code: 'FOLDER_NAME_COLLISION', file, path: file.slice(file.indexOf('/') + 1),
       message: '같은 부모 아래 대소문자만 다른 폴더가 겹칩니다. 이름 제안: ' + suggestResourceName(name, [...names.keys()]) });
   }
-  const groups = new Map<string, Map<string, string>>();
-  for (const file of sources.keys()) {
-    const match = /^plans\/([^/]+)\/([^/]+)\.yaml$/.exec(file);
-    if (!match) continue;
-    const [, plan, variant] = match;
-    if (!groups.has('plans')) groups.set('plans', new Map());
-    groups.get('plans')!.set(plan!, file);
-    if (!groups.has('plans/' + plan)) groups.set('plans/' + plan, new Map());
-    groups.get('plans/' + plan)!.set(variant!, file);
-  }
-  for (const names of groups.values()) {
-    for (const [name, file] of names) {
-      const error = resourceNameError(name);
-      const collision = [...names.keys()].some(other => other !== name && resourceNameKey(other) === resourceNameKey(name));
-      if (error || collision) result.push({ code: error ? 'NAME_INVALID' : 'NAME_COLLISION', file, path: name,
-        message: (error ?? '같은 폴더에서 대소문자만 다른 이름이 겹칩니다.') + ' 이름 제안: ' + suggestResourceName(name, [...names.keys()]) });
-    }
-  }
   return result;
 }
 
@@ -220,7 +186,7 @@ export function projectWithChanges(project: Project, changes: ReadonlyMap<string
     const resource = resourceEntry(file);
     const marker = /^(?:schemas|tables|documents)\/(?:[^/]+\/)*\.gitkeep$/.test(file);
     if (file.split('/').some(part => !part || part === '.' || part === '..' || part.includes('\\')) ||
-        !(resource || marker || /^plans\/[^/]+\/[^/]+\.yaml$/.test(file) || /^imports\/[a-f0-9]{64}\.json$/.test(file) || file === '.gitattributes')) {
+        !(resource || marker || /^imports\/[a-f0-9]{64}\.json$/.test(file) || file === '.gitattributes')) {
       throw new VibeError('FILE_UNKNOWN', 'Invalid managed path: ' + file);
     }
     if (source === null) sources.delete(file);
@@ -241,7 +207,7 @@ export function projectWithChanges(project: Project, changes: ReadonlyMap<string
   for (const [file, source] of sources) {
     if (!file.endsWith('.yaml')) continue;
     // Changes are prepared from one already-read snapshot. Reuse untouched ASTs
-    // instead of reparsing a large unrelated table for every alternative/field.
+    // instead of reparsing a large unrelated table for every field edit.
     // Writers clone ASTs or replace source ranges; disk reads still parse anew.
     const previous = project.files.get(file);
     if (previous && previous.source === source) { files.set(file, previous); continue; }

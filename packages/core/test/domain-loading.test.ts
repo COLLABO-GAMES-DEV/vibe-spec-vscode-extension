@@ -70,24 +70,6 @@ it.skipIf(process.platform==='win32')('refuses nested symlinks instead of readin
   await expect(loadProject(root)).rejects.toMatchObject({code:'FILE_UNSUPPORTED'});
 });
 
-it('moving a domain leaves symmetric variant addresses and bytes intact, and approval writes the nested baseline', async () => {
-  const { createPlan, writeVariant, readVariant, approvePlan, applyFolderEdit } = await import('../src/index.js');
-  const { root, project } = await fixture();
-  let current = (await createPlan(root,project.revision,'value-review',{title:'값 비교',status:'review'})).project;
-  current = (await writeVariant(root,current.revision,'value-review','A',{set:{'gold/one/value':'0.5'}})).project;
-  current = (await writeVariant(root,current.revision,'value-review','B',{set:{'gold/one/value':'0.8'}})).project;
-  const patches = [...current.sources].filter(([file])=>file.startsWith('plans/'));
-  current = (await applyFolderEdit(root,current.revision,{op:'folder-rename',path:'경제',name:'성장'})).project;
-  for (const [file,source] of patches) expect(current.sources.get(file)).toBe(source);
-  expect(readPath(readVariant(current,'value-review','A'),'gold/one/value')).toEqual({value:'0.5',present:true});
-  expect(readPath(readVariant(current,'value-review','B'),'gold/one/value')).toEqual({value:'0.8',present:true});
-  expect(validateProject(current)).toEqual([]);
-  current = (await approvePlan(root,current.revision,'value-review','B')).project;
-  expect(readPath(current,'gold/one/value')).toEqual({value:'0.8',present:true});
-  expect(resourceFile(current,'table','gold')).toBe('tables/성장/재화/gold.yaml');
-  expect(current.sources.has('tables/gold.yaml')).toBe(false);
-});
-
 
 it.skipIf(process.platform === 'win32' || process.getuid?.() === 0)('keeps an unreadable nested file distinct from a missing planning root', async () => {
   const { root, project } = await fixture();

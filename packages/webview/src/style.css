@@ -100,12 +100,10 @@ h2 { font-size: 13px; margin: 0 0 6px; }
 .toolbar { min-height: 32px; flex-wrap: wrap; }
 .toolbar h1 { font-size: 20px; letter-spacing: -.02em; }
 .toolbar > div { gap: 10px; }
-.toolbar-actions button, .view-tools button, .find-bar button,
-.plans-toolbar button, .plans-actions button {
+.toolbar-actions button, .view-tools button, .find-bar button {
   background: var(--secondary); color: var(--secondary-ink); border-color: var(--line);
 }
-.toolbar-actions button:hover, .view-tools button:hover, .find-bar button:hover,
-.plans-toolbar button:hover, .plans-actions button:hover { background: var(--secondary-hover); }
+.toolbar-actions button:hover, .view-tools button:hover, .find-bar button:hover { background: var(--secondary-hover); }
 .view-tools { padding: 8px 0; border-bottom: 1px solid var(--line); gap: 12px; }
 .view-tools input, .view-tools select, .find-bar input { border-radius: 4px; padding: 5px 6px; background: var(--input-surface); color: var(--input-ink); }
 .grid-scroll { border-radius: 5px; background: var(--canvas); }
@@ -116,4 +114,3 @@ h2 { font-size: 13px; margin: 0 0 6px; }
 .grid-cell.key-cell { box-shadow: 1px 0 0 var(--line); }
 .diagnostics { padding: 10px 0 0; }
 .diagnostics h2 { margin-bottom: 6px; }
-.baseline-banner { padding: 8px 10px; border-left-width: 2px; border-radius: 3px; font-size: 12px; }

@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { randomBytes } from 'node:crypto';
-export function webviewHtml(context: vscode.ExtensionContext, panel: vscode.WebviewPanel, mode: 'table' | 'import' | 'git' | 'tables' | 'plans' | 'documents') {
+export function webviewHtml(context: vscode.ExtensionContext, panel: vscode.WebviewPanel, mode: 'table' | 'import' | 'git' | 'tables' | 'documents') {
   const assets = vscode.Uri.joinPath(context.extensionUri, 'dist', 'webview');
   const nonce = randomBytes(16).toString('hex');
   const script = panel.webview.asWebviewUri(vscode.Uri.joinPath(assets, 'app.js'));
